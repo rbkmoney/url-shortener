@@ -1,0 +1,14 @@
+{application, shortener, [
+    {description, "Url shortener service"},
+    {vsn, "0"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib
+    ]},
+    {env, []},
+    {modules, []},
+    {maintainers, [
+        "Dmitry Manik <d.manik@rbkmoney.com>"
+    ]}
+]}.
