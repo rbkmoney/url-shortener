@@ -1,4 +1,5 @@
 .eunit
+/_build/
 deps
 *.o
 *.beam
@@ -8,3 +9,14 @@ ebin/*.beam
 rel/example_project
 .concrete/DEV_MODE
 .rebar
+
+.DS_Store
+
+# rebar
+/_checkouts/
+
+# containerization
+\#*
+.\#*
+Dockerfile
+docker-compose.yml
