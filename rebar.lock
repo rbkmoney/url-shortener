@@ -1,1 +1,14 @@
-[].
+{"1.1.0",
+[{<<"jesse">>,
+  {git,"git@github.com:rbkmoney/jesse.git",
+       {ref,"39105922d1ce5834383d8e8aa877c60319b9834a"}},
+  0},
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.2">>},0},
+ {<<"pooler">>,{pkg,<<"pooler">>,<<"1.5.0">>},0},
+ {<<"rfc3339">>,{pkg,<<"rfc3339">>,<<"0.2.1">>},0}]}.
+[
+{pkg_hash,[
+ {<<"jsx">>, <<"7ACC7D785B5ABE8A6E9ADBDE926A24E481F29956DD8B4DF49E3E4E7BCC92A018">>},
+ {<<"pooler">>, <<"0FD4BE5D2976E6A2E9A1617623031758C26F200C1FCA89E4A3C542747BEC6371">>},
+ {<<"rfc3339">>, <<"0F037D3385A724BC78C732CF83384B2CC7A643F9ADDBF3FDB38A4BC6A6CD0069">>}]}
+].
