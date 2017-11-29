@@ -1,5 +1,5 @@
 REBAR := $(shell which rebar3 2>/dev/null || which ./rebar3)
-SUBMODULES = build_utils
+SUBMODULES = schemes/swag-url-shortener build_utils
 SUBTARGETS = $(patsubst %,%/.git,$(SUBMODULES))
 
 UTILS_PATH := build_utils
@@ -17,9 +17,9 @@ BASE_IMAGE_NAME := service_erlang
 BASE_IMAGE_TAG := 16e2b3ef17e5fdefac8554ced9c2c74e5c6e9e11
 
 # Build image tag to be used
-BUILD_IMAGE_TAG := 4fa802d2f534208b9dc2ae203e2a5f07affbf385
+BUILD_IMAGE_TAG := eee42f2ca018c313190bc350fe47d4dea70b6d27
 
-CALL_ANYWHERE := all submodules rebar-update compile xref lint dialyze start devrel release clean distclean
+CALL_ANYWHERE := all submodules rebar-update compile xref lint dialyze start devrel release clean distclean swag.regenerate
 
 CALL_W_CONTAINER := $(CALL_ANYWHERE) test
 
@@ -39,6 +39,10 @@ submodules: $(SUBTARGETS)
 
 rebar-update:
 	$(REBAR) update
+
+generate: swag.generate
+
+regenerate: swag.regenerate
 
 compile: submodules rebar-update
 	$(REBAR) compile
@@ -64,13 +68,35 @@ release: distclean
 clean:
 	$(REBAR) clean
 
-distclean:
+distclean: swag.distclean
 	$(REBAR) clean -a
 	rm -rf _build
 
 # CALL_W_CONTAINER
-test: submodules
+test: submodules generate
 	$(REBAR) ct
 
-test.%: apps/url-shortener/test/shortener_%_tests_SUITE.erl
-$(REBAR) ct --suite=$^
+# Swagger stuff
+SWAGGER_CODEGEN = $(call which, swagger-codegen)
+SWAGGER_SCHEME_PATH = schemes/swag-url-shortener
+SWAGGER_SCHEME = $(SWAGGER_SCHEME_PATH)/swagger.yaml
+
+$(SWAGGER_SCHEME): $(SWAGGER_SCHEME_PATH)/.git
+
+SWAG_PREFIX = swag
+SWAG_APP_PATH = apps/$(SWAG_PREFIX)
+SWAG_APP_TARGET = $(SWAG_APP_PATH)/rebar.config
+
+swag.generate: $(SWAG_APP_TARGET)
+
+swag.distclean:
+	rm -rfv $(SWAG_APP_PATH)
+
+swag.regenerate: swag.distclean swag.generate
+
+$(SWAG_APP_TARGET): $(SWAGGER_SCHEME)
+	$(SWAGGER_CODEGEN) generate \
+		-i $(SWAGGER_SCHEME) \
+		-l erlang-server \
+		-o $(SWAG_APP_PATH) \
+		--additional-properties packageName=$(SWAG_PREFIX)
