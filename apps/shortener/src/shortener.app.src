@@ -2,9 +2,16 @@
     {description, "Url shortener service"},
     {vsn, "0"},
     {registered, []},
+    {mod, {shortener, []}},
     {applications, [
         kernel,
-        stdlib
+        stdlib,
+        lager,
+        lager_logstash_formatter,
+        genlib,
+        jose,
+        cowboy_cors,
+        swag
     ]},
     {env, []},
     {modules, []},
