@@ -1,0 +1,6 @@
+-sname shortener
+
+-setcookie shortener_cookie
+
++K true
++A 10

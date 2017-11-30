@@ -8,13 +8,13 @@
 
 %%
 
--spec start(normal, any()) ->
-    {ok, pid()} | {error, any()}.
+-spec start(normal, any()) -> {ok, pid()} | {error, any()}.
+
 start(_StartType, _StartArgs) ->
     shortener_sup:start_link().
 
--spec stop(any()) ->
-    ok.
+-spec stop(any()) -> ok.
+
 stop(_State) ->
     ok.
 
