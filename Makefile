@@ -44,7 +44,7 @@ generate: swag.generate
 
 regenerate: swag.regenerate
 
-compile: submodules rebar-update
+compile: submodules rebar-update generate
 	$(REBAR) compile
 
 xref: submodules
@@ -62,7 +62,7 @@ start: submodules
 devrel: submodules
 	$(REBAR) release
 
-release: submodules distclean generate
+release: submodules generate
 	$(REBAR) as prod release
 
 clean:

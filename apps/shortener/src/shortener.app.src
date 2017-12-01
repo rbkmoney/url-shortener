@@ -10,6 +10,7 @@
         lager_logstash_formatter,
         genlib,
         jose,
+        cowboy,
         cowboy_cors,
         swag
     ]},

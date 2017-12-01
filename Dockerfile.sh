@@ -2,8 +2,8 @@
 cat <<EOF
 FROM $BASE_IMAGE
 MAINTAINER Dmitry Manik <d.manik@rbkmoney.com>
-COPY ./_build/prod/rel/url-shortener /opt/url-shortener
-CMD /opt/url-shortener/bin/url-shortener foreground
+COPY ./_build/prod/rel/shortener /opt/shortener
+CMD /opt/shortener/bin/shortener foreground
 EXPOSE 8022
 LABEL base_image_tag=$BASE_IMAGE_TAG
 LABEL build_image_tag=$BUILD_IMAGE_TAG
