@@ -283,15 +283,6 @@ check_expiration(C, V) ->
 
 %%
 
-% encode_roles(Roles) ->
-%     #{
-%         <<"resource_access">> => #{
-%             <<"common-api">> => #{
-%                 <<"roles">> => Roles
-%             }
-%         }
-%     }.
-
 decode_roles(Claims = #{
     <<"resource_access">> := #{
         <<"shortener">> := #{

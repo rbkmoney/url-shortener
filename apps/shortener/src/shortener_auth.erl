@@ -1,10 +1,9 @@
 -module(shortener_auth).
 
 -export([authorize_api_key/2]).
--export([authorize_operation/1]).
 
--type context() :: capi_authorizer_jwt:t().
--type claims()  :: capi_authorizer_jwt:claims().
+-type context() :: shortener_authorizer_jwt:t().
+-type claims()  :: shortener_authorizer_jwt:claims().
 
 -export_type([context/0]).
 -export_type([claims/0]).
@@ -54,20 +53,4 @@ authorize_api_key(_OperationID, bearer, Token) ->
     % NOTE
     % We are knowingly delegating actual request authorization to the logic handler
     % so we could gather more data to perform fine-grained access control.
-    capi_authorizer_jwt:verify(Token).
-
-%%
-
--spec authorize_operation(Auth :: capi_authorizer_jwt:t()) ->
-    ok | {error, unauthorized}.
-
-authorize_operation({{_SubjectID, ACL}, _}) ->
-    {Scope, Permission} = {shortened_urls, write},
-    case lists:member(Permission, capi_acl:match(Scope, ACL)) of
-        true ->
-            ok;
-        false ->
-            {error, unauthorized}
-    end.
-
-%%
+    shortener_authorizer_jwt:verify(Token).
