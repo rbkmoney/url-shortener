@@ -17,11 +17,10 @@
 -define(REALM, <<"external">>).
 
 -spec authorize_api_key(swag_server:operation_id(), swag_server:api_key()) ->
-    Result :: false | {true, capi_auth:context()}.
+    Result :: false | {true, shortener_auth:context()}.
 
 authorize_api_key(OperationID, ApiKey) ->
-    _ = capi_utils:logtag_process(operation_id, OperationID),
-    capi_auth:authorize_api_key(OperationID, ApiKey).
+    shortener_auth:authorize_api_key(OperationID, ApiKey).
 
 -type request_data() :: #{atom() | binary() => term()}.
 
@@ -34,7 +33,6 @@ authorize_api_key(OperationID, ApiKey) ->
 
 handle_request(OperationID, Req, Context) ->
     _ = lager:info("Processing request ~p", [OperationID]),
-    % Auth should be here
     ReqContext = create_context(Req, get_auth_context(Context)),
     process_request(OperationID, Req, Context, ReqContext).
 
@@ -77,7 +75,7 @@ process_request('DeleteShortenedUrl', Req, Context, ReqCtx) ->
 
 shorten_url(Params, _Context, ReqCtx) ->
     ShortenedUrl = create_shortened_url(Params),
-    {ok, _Result} = shortener_automaton_client:call(?NS, ShortenedUrl, marshal(ShortenedUrl), ReqCtx),
+    {ok, _Result} = shortener_automaton_client:start(?NS, ShortenedUrl, marshal(ShortenedUrl), ReqCtx),
     {ok, ShortenedUrl}.
 
 get_shortened_url(ID, _Context, ReqCtx) ->
