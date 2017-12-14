@@ -38,10 +38,32 @@ start_link() ->
 -spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 
 init([]) ->
-    Authorizers = genlib_app:env(shortener, authorizers, #{}),
-    AuthorizerSpec = shortener_authorizer_jwt:get_child_spec(maps:get(jwt, Authorizers)),
-    SwaggerServerSpec = shortener_swagger_server:child_spec(shortener_handler),
     {ok, {
        {one_for_all, 0, 1},
-       [AuthorizerSpec, SwaggerServerSpec]
+       % TODO
+       get_processor_childspecs(genlib_app:env(?MODULE, api)) ++
+       get_api_childspecs(genlib_app:env(?MODULE, processor))
     }}.
+
+get_processor_childspecs(Opts) ->
+    {ok, IP} = inet:parse_address(maps:get(ip, Opts, "::")),
+    [woody_server:child_spec(
+        ?MODULE,
+        #{
+            ip            => IP,
+            port          => maps:get(port, Opts, 8022),
+            net_opts      => maps:get(net_opts, Opts, []),
+            event_handler => scoper_woody_event_handler,
+            handlers      => [
+                {"/v1/stateproc", {
+                    {mg_proto_state_processing_thrift, 'Processor'},
+                    shortener_slug
+                }}
+            ]
+        }
+    )].
+
+get_api_childspecs(Opts) ->
+    AuthorizerSpec = shortener_authorizer_jwt:get_child_spec(maps:get(authorizer, Opts)),
+    SwaggerServerSpec = shortener_swagger_server:child_spec(shortener_handler, Opts),
+    [AuthorizerSpec, SwaggerServerSpec].

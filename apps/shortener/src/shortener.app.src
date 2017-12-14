@@ -12,7 +12,9 @@
         jose,
         cowboy,
         cowboy_cors,
-        swag
+        swag,
+        woody,
+        woody_user_identity
     ]},
     {env, []},
     {modules, []},

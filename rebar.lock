@@ -57,6 +57,10 @@
  {<<"woody">>,
   {git,"git@github.com:rbkmoney/woody_erlang.git",
        {ref,"ad1e91050c36d8de15f1c7d8dd8a2c682d2d158c"}},
+  0},
+ {<<"woody_user_identity">>,
+  {git,"git@github.com:rbkmoney/woody_erlang_user_identity.git",
+       {ref,"9c7ad2b8beac9c88c54594b264743dec7b9cf696"}},
   0}]}.
 [
 {pkg_hash,[

@@ -1,119 +1,45 @@
 -module(shortener_handler).
 
+%% Swagger handler
+
 -behaviour(swag_logic_handler).
-
--define(NS, <<"shortener">>).
--define(DOMAIN, "rbk.mn/").
-
--define(shortened_url(ID, ShortenedUrl, SourceUrl, ExpiresAt),
-    {ID, ShortenedUrl, SourceUrl, ExpiresAt}
-).
-
-%% API callbacks
 -export([authorize_api_key/2]).
 -export([handle_request/3]).
 
-%% @WARNING Must be refactored in case of different classes of users using this API
+%% Cowboy http handler
+
+-behaviour(cowboy_http_handler).
+-export([init/3]).
+-export([handle/2]).
+-export([terminate/3]).
+
+%%
+
+%% TODO refactor in case of different classes of users using this API
 -define(REALM, <<"external">>).
 
--spec authorize_api_key(swag_server:operation_id(), swag_server:api_key()) ->
+-type operation_id() :: swag:operation_id().
+-type request_ctx()  :: swag:request_context().
+-type request_data() :: #{atom() | binary() => term()}.
+
+-spec authorize_api_key(operation_id(), swag:api_key()) ->
     Result :: false | {true, shortener_auth:context()}.
 
 authorize_api_key(OperationID, ApiKey) ->
     shortener_auth:authorize_api_key(OperationID, ApiKey).
 
--type request_data() :: #{atom() | binary() => term()}.
-
--spec handle_request(
-    OperationID :: swag_server:operation_id(),
-    Req :: request_data(),
-    Context :: swag_server:request_context()
-) ->
-    {ok | error, swag_server_logic_handler:response()}.
+-spec handle_request(operation_id(), request_data(), request_ctx()) ->
+    {ok | error, swag_logic_handler:response()}.
 
 handle_request(OperationID, Req, Context) ->
-    _ = lager:info("Processing request ~p", [OperationID]),
-    ReqContext = create_context(Req, get_auth_context(Context)),
-    process_request(OperationID, Req, Context, ReqContext).
-
-%%
-
--spec process_request(
-    OperationID :: swag:operation_id(),
-    Req :: request_data(),
-    Context :: swag:request_context(),
-    ReqCtx :: woody_context:ctx()
-) ->
-    {Code :: non_neg_integer(), Headers :: [], Response :: #{}}.
-
-process_request('ShortenUrl', Req, Context, ReqCtx) ->
-    Result = shorten_url(maps:get('ShortenedUrlParams', Req), Context, ReqCtx),
-    case Result of
-        {ok, ShortenedUrl} ->
-            {ok, {201, [], ShortenedUrl}};
-        {exception, Exception} ->
-            {error, {400, [], Exception}}
-    end;
-process_request('GetShortenedUrl', Req, Context, ReqCtx) ->
-    Result = get_shortened_url(maps:get(shortenedUrlID, Req), Context, ReqCtx),
-    case Result of
-        {ok, ShortenedUrl} ->
-            {ok, {200, [], ShortenedUrl}};
-        {exception, Exception} ->
-            {error, {400, [], Exception}}
-    end;
-process_request('DeleteShortenedUrl', Req, Context, ReqCtx) ->
-    Result = delete_shortened_url(maps:get(shortenedUrlID, Req), Context, ReqCtx),
-    case Result of
-        ok ->
-            {ok, {204, [], undefined}};
-        {exception, Exception} ->
-            {error, {400, [], Exception}}
-    end.
-
-%%
-
-shorten_url(Params, _Context, ReqCtx) ->
-    ShortenedUrl = create_shortened_url(Params),
-    {ok, _Result} = shortener_automaton_client:start(?NS, ShortenedUrl, marshal(ShortenedUrl), ReqCtx),
-    {ok, ShortenedUrl}.
-
-get_shortened_url(ID, _Context, ReqCtx) ->
-    {ok, History} = shortener_automaton_client:get_history(?NS, ID, ReqCtx),
-    ShortenedUrl = get_url(History),
-    {ok, ShortenedUrl}.
-
-delete_shortened_url(ID, _Context, ReqCtx) ->
-    shortener_automaton_client:remove(?NS, ID, ReqCtx).
-
-%%
-
-create_shortened_url(#{'SourceUrl' := SourceUrl, 'ExpiresAt' := ExpiresAt}) ->
-    ShortenedUrl = hash_url(SourceUrl),
-    ?shortened_url(ShortenedUrl, make_full_shortened_url(ShortenedUrl), SourceUrl, ExpiresAt).
-
-hash_url(Url) ->
-    ShortenedUrl = crypto:hash(sha224, Url),
-    case get_shortened_url(ShortenedUrl) of
-        {error, #'MachineNotFound'{}} ->
-            ShortenedUrl;
-        {ok, _} ->
-            hash_url(ShortenedUrl)
-    end.
-
-make_full_shortened_url(Url) ->
-    ?DOMAIN ++ Url.
-
-%%
-
-get_auth_context(#{auth_context := AuthContext}) ->
-    AuthContext.
+    _ = lager:info("Processing request ~p", [OperationID]), % FIXME
+    WoodyCtx = create_context(Req, get_auth_context(Context)),
+    process_request(OperationID, Req, WoodyCtx).
 
 create_context(#{'X-Request-ID' := RequestID}, AuthContext) ->
-    RpcID = #{trace_id := TraceID} = woody_context:new_rpc_id(genlib:to_binary(RequestID)),
-    _ = lager:debug("Created TraceID:~p for RequestID:~p", [TraceID , RequestID]),
-    WoodyContext = woody_context:new(RpcID),
-    woody_user_identity:put(collect_user_identity(AuthContext), WoodyContext).
+    RpcID = woody_context:new_rpc_id(genlib:to_binary(RequestID)),
+    WoodyCtx = woody_context:new(RpcID),
+    woody_user_identity:put(collect_user_identity(AuthContext), WoodyCtx).
 
 collect_user_identity(AuthContext) ->
     genlib_map:compact(#{
@@ -129,29 +55,122 @@ get_subject_id({{SubjectID, _ACL}, _}) ->
 get_claim(ClaimName, {_Subject, Claims}, Default) ->
     maps:get(ClaimName, Claims, Default).
 
+get_auth_context(#{auth_context := AuthContext}) ->
+    AuthContext.
+
 %%
 
-marshal(?shortened_url(ID, ShortenedUrl, SourceUrl, ExpiresAt)) ->
-    #{
-        <<"id">> => marshal(ID),
-        <<"shortened_url">> => marshal(ShortenedUrl),
-        <<"source_url">> => marshal(SourceUrl),
-        <<"expires_at">> => marshal(ExpiresAt)
-    };
-marshal(Value) ->
-    shortener_msgpack_marshalling:marshal(Value).
+-spec process_request(operation_id(), request_data(), woody_context:ctx()) ->
+    {Code :: non_neg_integer(), Headers :: [], Response :: #{}}.
 
-unmarshal(#{
-    <<"id">> := ID,
-    <<"shortened_url">> := ShortenedUrl,
-    <<"source_url">> := SourceUrl,
-    <<"expires_at">> := ExpiresAt
-}) ->
-    ?shortened_url(
-        unmarshal(ID),
-        unmarshal(ShortenedUrl),
-        unmarshal(SourceUrl),
-        unmarshal(ExpiresAt)
-    );
-unmarshal(Value) ->
-    shortener_msgpack_marshalling:unmarshal(Value).
+process_request(
+    'ShortenUrl',
+    #{'ShortenedUrlParams' := #{
+        <<"sourceUrl">> := SourceUrl,
+        <<"expiresAt">> := ExpiresAt
+    }},
+    WoodyCtx
+) ->
+    Slug = shortener_slug:create(SourceUrl, parse_timestamp(ExpiresAt), WoodyCtx),
+    {ok, {201, [], construct_shortened_url(Slug)}};
+
+process_request(
+    'GetShortenedUrl',
+    #{'shortenedUrlID' := ID},
+    WoodyCtx
+) ->
+    case shortener_slug:get(ID, WoodyCtx) of
+        {ok, Slug} ->
+            {ok, {200, [], construct_shortened_url(Slug)}};
+        {error, notfound} ->
+            {error, {404, [], #{<<"message">> => <<"Not found">>}}}
+    end;
+
+process_request(
+    'DeleteShortenedUrl',
+    #{'shortenedUrlID' := ID},
+    WoodyCtx
+) ->
+    case shortener_slug:remove(ID, WoodyCtx) of
+        ok ->
+            {ok, {204, [], undefined}};
+        {error, notfound} ->
+            {error, {404, [], #{<<"message">> => <<"Not found">>}}}
+    end.
+
+construct_shortened_url(
+    #{
+        id := ID,
+        source := Source,
+        expires_at := ExpiresAt
+    }
+) ->
+    #{
+        <<"id">> => ID,
+        <<"shortenedUrl">> => render_short_url(ID, get_short_url_template()),
+        <<"sourceUrl">> => Source,
+        <<"expiresAt">> => ExpiresAt
+    }.
+
+get_short_url_template() ->
+    % TODO
+    maps:get(short_url_template, genlib_app:env(shortener, api)).
+
+render_short_url(ID, Template) ->
+    iolist_to_binary([
+        genlib:to_binary(maps:get(scheme, Template)),
+        <<"://">>,
+        genlib:to_binary(maps:get(host, Template)),
+        genlib:to_binary(maps:get(path, Template)),
+        ID
+    ]).
+
+parse_timestamp(Timestamp) ->
+    {ok, {Date, Time, Usec, TZOffset}} = rfc3339:parse(Timestamp),
+    Seconds = calendar:datetime_to_gregorian_seconds({Date, Time}),
+    {DateUTC, TimeUTC} = calendar:gregorian_seconds_to_datetime(
+        case TZOffset of
+            _ when is_integer(TZOffset) ->
+                Seconds - (60 * TZOffset);
+            _ ->
+                Seconds
+        end
+    ),
+    {ok, TimestampUTC} = rfc3339:format({DateUTC, TimeUTC, Usec, 0}),
+    TimestampUTC.
+
+%%
+
+-type state()            :: undefined.
+-type request()          :: cowboy_req:req().
+-type terminate_reason() :: {normal, shutdown} | {error, atom()}.
+
+-spec init({atom(), http}, request(), _) ->
+    {ok, request(), state()}.
+
+init({_, http}, Req, _Opts) ->
+    {ok, Req, undefined}.
+
+-spec handle(request(), state()) ->
+    {ok, request(), state()}.
+
+handle(Req1, St) ->
+    {ID, Req2} = cowboy_req:binding('shortenedUrlID', Req1),
+    case shortener_slug:get(ID, woody_context:new()) of
+        {ok, #{source := Source, expires_at := ExpiresAt}} ->
+            {ok, {Date, Time, _, undefined}} = rfc3339:parse(ExpiresAt),
+            Headers = [
+                {<<"location">>      , Source},
+                {<<"expires">>       , cowboy_clock:rfc1123({Date, Time})},
+                {<<"cache-control">> , <<"must-revalidate">>}
+            ],
+            {ok, cowboy_req:reply(308, Headers, Req2), St};
+        {error, notfound} ->
+            {ok, cowboy_req:reply(404, Req2), St}
+    end.
+
+-spec terminate(terminate_reason(), request(), state()) ->
+    ok.
+
+terminate(_Reason, _Req, _St) ->
+    ok.
