@@ -137,17 +137,16 @@ failed_authorization(C) ->
 insufficient_permissions(C) ->
     Params = construct_params(<<"https://oops.io/">>),
     C1 = set_api_auth_token(insufficient_permissions, [], C),
-    % TODO
-    {error, {invalid_response_code, 403}} = shorten_url(Params, C1),
-    {error, {invalid_response_code, 403}} = delete_shortened_url(<<"42">>, C1),
-    {error, {invalid_response_code, 403}} = get_shortened_url(<<"42">>, C1).
+    {ok, 403, _, _} = shorten_url(Params, C1),
+    {ok, 403, _, _} = delete_shortened_url(<<"42">>, C1),
+    {ok, 403, _, _} = get_shortened_url(<<"42">>, C1).
 
 readonly_permissions(C) ->
     Params = construct_params(<<"https://oops.io/">>),
     {ok, 201, _, #{<<"id">> := ID}} = shorten_url(Params, C),
     C1 = set_api_auth_token(readonly_permissions, [{['shortened-urls'], read}], C),
     {ok, 200, _, #{<<"id">> := ID}} = get_shortened_url(ID, C1),
-    {error, {invalid_response_code, 403}} = delete_shortened_url(ID, C1).
+    {ok, 403, _, _} = delete_shortened_url(ID, C1).
 
 successful_redirect(C) ->
     SourceUrl = <<"https://example.com/">>,
