@@ -75,8 +75,16 @@ process_request(
     }},
     WoodyCtx
 ) ->
-    Slug = shortener_slug:create(SourceUrl, parse_timestamp(ExpiresAt), WoodyCtx),
-    {ok, {201, [], construct_shortened_url(Slug)}};
+    case validate_source_url(SourceUrl) of
+        true ->
+            Slug = shortener_slug:create(SourceUrl, parse_timestamp(ExpiresAt), WoodyCtx),
+            {ok, {201, [], construct_shortened_url(Slug)}};
+        false ->
+            {error, {400, [], #{
+                <<"code">> => <<"invalid_source_url">>,
+                <<"message">> => <<"Source URL is forbidden">>
+            }}}
+    end;
 
 process_request(
     'GetShortenedUrl',
@@ -102,6 +110,15 @@ process_request(
             {error, {404, [], #{<<"message">> => <<"Not found">>}}}
     end.
 
+validate_source_url(SourceUrl) ->
+    lists:any(
+        fun (Pattern) -> is_source_url_valid(SourceUrl, Pattern) end,
+        get_source_url_whitelist()
+    ).
+
+is_source_url_valid(SourceUrl, Pattern) ->
+    genlib_wildcard:match(SourceUrl, genlib:to_binary(Pattern)).
+
 construct_shortened_url(
     #{
         id := ID,
@@ -115,10 +132,6 @@ construct_shortened_url(
         <<"sourceUrl">> => Source,
         <<"expiresAt">> => ExpiresAt
     }.
-
-get_short_url_template() ->
-    % TODO
-    maps:get(short_url_template, genlib_app:env(shortener, api)).
 
 render_short_url(ID, Template) ->
     iolist_to_binary([
@@ -142,6 +155,14 @@ parse_timestamp(Timestamp) ->
     ),
     {ok, TimestampUTC} = rfc3339:format({DateUTC, TimeUTC, Usec, 0}),
     TimestampUTC.
+
+get_short_url_template() ->
+    % TODO
+    maps:get(short_url_template, genlib_app:env(shortener, api)).
+
+get_source_url_whitelist() ->
+    % TODO
+    maps:get(source_url_whitelist, genlib_app:env(shortener, api), []).
 
 %%
 

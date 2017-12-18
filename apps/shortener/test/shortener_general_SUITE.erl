@@ -8,6 +8,7 @@
 
 -export([successful_redirect/1]).
 -export([successful_delete/1]).
+-export([fordidden_source_url/1]).
 -export([url_expired/1]).
 -export([always_unique_url/1]).
 
@@ -23,6 +24,7 @@ all() ->
     [
         successful_redirect,
         successful_delete,
+        fordidden_source_url,
         url_expired,
         always_unique_url
     ].
@@ -59,6 +61,11 @@ init_per_suite(C) ->
                         local      => {pem_file, get_keysource("keys/local/private.pem", C)}
                     }
                 },
+                source_url_whitelist => [
+                    "https://*",
+                    "ftp://*",
+                    "http://localhost/*"
+                ],
                 short_url_template => #{
                     scheme         => http,
                     netloc         => Netloc,
@@ -101,36 +108,35 @@ end_per_testcase(_Name, _C) ->
 
 -spec successful_redirect(config()) -> _.
 -spec successful_delete(config()) -> _.
+-spec fordidden_source_url(config()) -> _.
 -spec url_expired(config()) -> _.
 -spec always_unique_url(config()) -> _.
 
 successful_redirect(C) ->
     SourceUrl = <<"https://example.com/">>,
-    ShortenedUrlParams = #{
-        <<"sourceUrl">> => SourceUrl,
-        <<"expiresAt">> => format_ts(genlib_time:unow() + 3600)
-    },
-    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(ShortenedUrlParams, C),
+    Params = construct_params(SourceUrl),
+    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C),
     {ok, 200, _, #{<<"sourceUrl">> := SourceUrl, <<"shortenedUrl">> := ShortUrl}} = get_shortened_url(ID, C),
     {ok, 301, Headers, _} = hackney:request(get, ShortUrl),
     {<<"location">>, SourceUrl} = lists:keyfind(<<"location">>, 1, Headers).
 
 successful_delete(C) ->
-    ShortenedUrlParams = #{
-        <<"sourceUrl">> => <<"https://oops.io/">>,
-        <<"expiresAt">> => format_ts(genlib_time:unow() + 3600)
-    },
-    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(ShortenedUrlParams, C),
+    Params = construct_params(<<"https://oops.io/">>),
+    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C),
     {ok, 204, _, _} = delete_shortened_url(ID, C),
     {ok, 404, _, _} = get_shortened_url(ID, C),
     {ok, 404, _, _} = hackney:request(get, ShortUrl).
 
+fordidden_source_url(C) ->
+    {ok, 201, _, #{}} = shorten_url(construct_params(<<"http://localhost/hack?id=42">>), C),
+    {ok, 201, _, #{}} = shorten_url(construct_params(<<"https://localhost/hack?id=42">>), C),
+    {ok, 400, _, #{}} = shorten_url(construct_params(<<"http://example.io/">>), C),
+    {ok, 400, _, #{}} = shorten_url(construct_params(<<"http://local.domain/phpmyadmin">>), C),
+    {ok, 201, _, #{}} = shorten_url(construct_params(<<"ftp://ftp.hp.com/pub/hpcp/newsletter_july2003">>), C).
+
 url_expired(C) ->
-    ShortenedUrlParams = #{
-        <<"sourceUrl">> => <<"https://oops.io/">>,
-        <<"expiresAt">> => format_ts(genlib_time:unow() + 1)
-    },
-    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(ShortenedUrlParams, C),
+    Params = construct_params(<<"https://oops.io/">>, 1),
+    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C),
     {ok, 200, _, #{<<"shortenedUrl">> := ShortUrl}} = get_shortened_url(ID, C),
     ok = timer:sleep(2 * 1000),
     {ok, 404, _, _} = get_shortened_url(ID, C),
@@ -138,19 +144,23 @@ url_expired(C) ->
 
 always_unique_url(C) ->
     N = 42,
-    ShortenedUrlParams = #{
-        <<"sourceUrl">> => <<"https://oops.io/">>,
-        <<"expiresAt">> => format_ts(genlib_time:unow() + 3600)
-    },
+    Params = construct_params(<<"https://oops.io/">>, 3600),
     {IDs, ShortUrls} = lists:unzip([
         {ID, ShortUrl} ||
-            _ <-
-                lists:seq(1, N),
-            {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} <-
-                [shorten_url(ShortenedUrlParams, C)]
+            _ <- lists:seq(1, N),
+            {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} <- [shorten_url(Params, C)]
     ]),
     N = length(lists:usort(IDs)),
     N = length(lists:usort(ShortUrls)).
+
+construct_params(SourceUrl) ->
+    construct_params(SourceUrl, 3600).
+
+construct_params(SourceUrl, Lifetime) ->
+    #{
+        <<"sourceUrl">> => SourceUrl,
+        <<"expiresAt">> => format_ts(genlib_time:unow() + Lifetime)
+    }.
 
 %%
 
