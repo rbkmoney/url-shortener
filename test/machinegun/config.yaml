@@ -1,0 +1,6 @@
+namespaces:
+    url-shortener:
+        processor:
+            url: http://url-shortener:8022/v1/stateproc
+storage:
+    type: memory
