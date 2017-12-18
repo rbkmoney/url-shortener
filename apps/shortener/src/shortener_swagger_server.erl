@@ -32,7 +32,7 @@ get_cowboy_config(LogicHandler, Opts) ->
     ShortUrlPath = maps:get(path, ShortUrlTemplate),
     Routes =
         swag_router:get_paths(LogicHandler) ++
-        [{'_', {ShortUrlPath ++ ":shortenedUrlID", shortener_handler, #{}}}]
+        [{'_', [{genlib:to_list(ShortUrlPath) ++ ":shortenedUrlID", shortener_handler, #{}}]}]
     ,
     [
         {env, [

@@ -61,7 +61,7 @@ get_auth_context(#{auth_context := AuthContext}) ->
 %%
 
 -spec process_request(operation_id(), request_data(), woody_context:ctx()) ->
-    {Code :: non_neg_integer(), Headers :: [], Response :: #{}}.
+    {ok | error, swag_logic_handler:response()}.
 
 process_request(
     'ShortenUrl',
@@ -156,18 +156,19 @@ init({_, http}, Req, _Opts) ->
 
 handle(Req1, St) ->
     {ID, Req2} = cowboy_req:binding('shortenedUrlID', Req1),
-    case shortener_slug:get(ID, woody_context:new()) of
+    {ok, Req3} = case shortener_slug:get(ID, woody_context:new()) of
         {ok, #{source := Source, expires_at := ExpiresAt}} ->
-            {ok, {Date, Time, _, undefined}} = rfc3339:parse(ExpiresAt),
+            {ok, {Date, Time, _, _UndefinedButDialyzerDisagrees}} = rfc3339:parse(ExpiresAt),
             Headers = [
                 {<<"location">>      , Source},
                 {<<"expires">>       , cowboy_clock:rfc1123({Date, Time})},
                 {<<"cache-control">> , <<"must-revalidate">>}
             ],
-            {ok, cowboy_req:reply(308, Headers, Req2), St};
+            cowboy_req:reply(308, Headers, Req2);
         {error, notfound} ->
-            {ok, cowboy_req:reply(404, Req2), St}
-    end.
+            cowboy_req:reply(404, Req2)
+    end,
+    {ok, Req3, St}.
 
 -spec terminate(terminate_reason(), request(), state()) ->
     ok.
