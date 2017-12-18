@@ -30,10 +30,10 @@ get_socket_transport(Opts) ->
 get_cowboy_config(LogicHandler, Opts) ->
     ShortUrlTemplate = maps:get(short_url_template, Opts),
     ShortUrlPath = maps:get(path, ShortUrlTemplate),
-    Routes =
-        swag_router:get_paths(LogicHandler) ++
+    Routes = squash_routes(
+        swag_server_router:get_paths(LogicHandler) ++
         [{'_', [{genlib:to_list(ShortUrlPath) ++ ":shortenedUrlID", shortener_handler, #{}}]}]
-    ,
+    ),
     [
         {env, [
             {dispatch, cowboy_router:compile(Routes)},
@@ -47,3 +47,10 @@ get_cowboy_config(LogicHandler, Opts) ->
         {onrequest, cowboy_access_log:get_request_hook()},
         {onresponse, cowboy_access_log:get_response_hook(shortener_access_lager_event)}
     ].
+
+squash_routes(Routes) ->
+    orddict:to_list(lists:foldl(
+        fun ({K, V}, D) -> orddict:update(K, fun (V0) -> V0 ++ V end, V, D) end,
+        orddict:new(),
+        Routes
+    )).

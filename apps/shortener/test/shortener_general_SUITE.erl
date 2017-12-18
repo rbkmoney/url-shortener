@@ -3,8 +3,11 @@
 -export([all/0]).
 -export([init_per_suite/1]).
 -export([end_per_suite/1]).
+-export([init_per_testcase/2]).
+-export([end_per_testcase/2]).
 
 -export([successful_redirect/1]).
+-export([successful_delete/1]).
 -export([url_expired/1]).
 -export([always_unique_url/1]).
 
@@ -19,12 +22,19 @@
 all() ->
     [
         successful_redirect,
+        successful_delete,
         url_expired,
         always_unique_url
     ].
 
 -spec init_per_suite(config()) -> config().
 init_per_suite(C) ->
+    % _ = dbg:tracer(),
+    % _ = dbg:p(all, c),
+    % _ = dbg:tpl({shortener_swagger_server, '_', '_'}, x),
+    Host = "url-shortener",
+    Port = 8080,
+    Netloc = Host ++ ":" ++ genlib:to_list(Port),
     Apps =
         genlib_app:start_application_with(lager, [
             {async_threshold, 1},
@@ -38,17 +48,20 @@ init_per_suite(C) ->
         ]) ++ genlib_app:start_application_with(scoper, [
             {storage, scoper_storage_lager}
         ]) ++ genlib_app:start_application_with(shortener, [
-            {space_size             , 64},
+            {space_size             , 8},
             {hash_algorithm         , sha256},
             {api, #{
                 ip                 => "::",
-                port               => 8080,
+                port               => Port,
                 authorizer         => #{
-                    keyset         => #{}
+                    signee         => local,
+                    keyset => #{
+                        local      => {pem_file, get_keysource("keys/local/private.pem", C)}
+                    }
                 },
                 short_url_template => #{
                     scheme         => http,
-                    host           => "url-shortener",
+                    netloc         => Netloc,
                     path           => "/r/e/d/i/r/"
                 }
             }},
@@ -60,23 +73,122 @@ init_per_suite(C) ->
                 automaton          => #{url => <<"http://machinegun:8022/v1/automaton">>}
             }}
         ]),
-    [{suite_apps, Apps} | C].
+    [
+        {suite_apps, Apps},
+        {api_endpoint, "http://" ++ Netloc}
+    ] ++ C.
+
+get_keysource(Key, C) ->
+    filename:join(?config(data_dir, C), Key).
 
 -spec end_per_suite(config()) -> term().
 end_per_suite(C) ->
     genlib_app:stop_unload_applications(?config(suite_apps, C)).
 
+-spec init_per_testcase(test_case_name(), config()) ->
+    config().
+init_per_testcase(Name, C) ->
+    UserID = genlib:to_binary(Name),
+    {ok, T} = shortener_authorizer_jwt:issue({{UserID, []}, #{}}, unlimited),
+    [{api_auth_token, T} | C].
+
+-spec end_per_testcase(test_case_name(), config()) ->
+    config().
+end_per_testcase(_Name, _C) ->
+    ok.
+
 %%
 
 -spec successful_redirect(config()) -> _.
+-spec successful_delete(config()) -> _.
 -spec url_expired(config()) -> _.
 -spec always_unique_url(config()) -> _.
 
-successful_redirect(_C) ->
-    ok.
+successful_redirect(C) ->
+    SourceUrl = <<"https://example.com/">>,
+    ShortenedUrlParams = #{
+        <<"sourceUrl">> => SourceUrl,
+        <<"expiresAt">> => format_ts(genlib_time:unow() + 3600)
+    },
+    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(ShortenedUrlParams, C),
+    {ok, 200, _, #{<<"sourceUrl">> := SourceUrl, <<"shortenedUrl">> := ShortUrl}} = get_shortened_url(ID, C),
+    {ok, 301, Headers, _} = hackney:request(get, ShortUrl),
+    {<<"location">>, SourceUrl} = lists:keyfind(<<"location">>, 1, Headers).
 
-url_expired(_C) ->
-    ok.
+successful_delete(C) ->
+    ShortenedUrlParams = #{
+        <<"sourceUrl">> => <<"https://oops.io/">>,
+        <<"expiresAt">> => format_ts(genlib_time:unow() + 3600)
+    },
+    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(ShortenedUrlParams, C),
+    {ok, 204, _, _} = delete_shortened_url(ID, C),
+    {ok, 404, _, _} = get_shortened_url(ID, C),
+    {ok, 404, _, _} = hackney:request(get, ShortUrl).
 
-always_unique_url(_C) ->
-    ok.
+url_expired(C) ->
+    ShortenedUrlParams = #{
+        <<"sourceUrl">> => <<"https://oops.io/">>,
+        <<"expiresAt">> => format_ts(genlib_time:unow() + 1)
+    },
+    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(ShortenedUrlParams, C),
+    {ok, 200, _, #{<<"shortenedUrl">> := ShortUrl}} = get_shortened_url(ID, C),
+    ok = timer:sleep(2 * 1000),
+    {ok, 404, _, _} = get_shortened_url(ID, C),
+    {ok, 404, _, _} = hackney:request(get, ShortUrl).
+
+always_unique_url(C) ->
+    N = 42,
+    ShortenedUrlParams = #{
+        <<"sourceUrl">> => <<"https://oops.io/">>,
+        <<"expiresAt">> => format_ts(genlib_time:unow() + 3600)
+    },
+    {IDs, ShortUrls} = lists:unzip([
+        {ID, ShortUrl} ||
+            _ <-
+                lists:seq(1, N),
+            {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} <-
+                [shorten_url(ShortenedUrlParams, C)]
+    ]),
+    N = length(lists:usort(IDs)),
+    N = length(lists:usort(ShortUrls)).
+
+%%
+
+shorten_url(ShortenedUrlParams, C) ->
+    swag_client_shortener_api:shorten_url(
+        ?config(api_endpoint, C),
+        append_common_params(#{body => ShortenedUrlParams}, C)
+    ).
+
+delete_shortened_url(ID, C) ->
+    swag_client_shortener_api:delete_shortened_url(
+        ?config(api_endpoint, C),
+        append_common_params(#{binding => #{<<"shortenedUrlID">> => ID}}, C)
+    ).
+
+get_shortened_url(ID, C) ->
+    swag_client_shortener_api:get_shortened_url(
+        ?config(api_endpoint, C),
+        append_common_params(#{binding => #{<<"shortenedUrlID">> => ID}}, C)
+    ).
+
+append_common_params(Params, C) ->
+    append_media_type(append_auth(append_request_id(
+        maps:merge(#{binding => #{}, qs_val => #{}, header => #{}, body => #{}}, Params)
+    ), C)).
+
+append_media_type(Params = #{header := Headers}) ->
+    Params#{header => Headers#{
+        <<"Accept">>       => <<"application/json">>,
+        <<"Content-Type">> => <<"application/json; charset=utf-8">>
+    }}.
+
+append_auth(Params = #{header := Headers}, C) ->
+    Params#{header => Headers#{<<"Authorization">> => <<"Bearer ", (?config(api_auth_token, C))/binary>>}}.
+
+append_request_id(Params = #{header := Headers}) ->
+    Params#{header => Headers#{<<"X-Request-ID">> => woody_context:new_req_id()}}.
+
+format_ts(Ts) ->
+    {ok, Result} = rfc3339:format(Ts, seconds),
+    Result.

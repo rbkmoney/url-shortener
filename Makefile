@@ -19,7 +19,7 @@ BASE_IMAGE_TAG := 16e2b3ef17e5fdefac8554ced9c2c74e5c6e9e11
 # Build image tag to be used
 BUILD_IMAGE_TAG := eee42f2ca018c313190bc350fe47d4dea70b6d27
 
-CALL_ANYWHERE := all submodules rebar-update compile xref lint dialyze start devrel release clean distclean swag.regenerate
+CALL_ANYWHERE := all submodules rebar-update compile xref lint dialyze start devrel release clean distclean
 
 CALL_W_CONTAINER := $(CALL_ANYWHERE) test
 
@@ -39,10 +39,6 @@ submodules: $(SUBTARGETS)
 
 rebar-update:
 	$(REBAR) update
-
-generate: swag.generate
-
-regenerate: swag.regenerate
 
 compile: submodules rebar-update generate
 	$(REBAR) compile
@@ -65,10 +61,10 @@ devrel: submodules
 release: submodules generate
 	$(REBAR) as prod release
 
-clean:
+clean::
 	$(REBAR) clean
 
-distclean: swag.distclean
+distclean::
 	$(REBAR) clean -a
 	rm -rf _build
 
@@ -83,20 +79,24 @@ SWAGGER_SCHEME = $(SWAGGER_SCHEME_PATH)/swagger.yaml
 
 $(SWAGGER_SCHEME): $(SWAGGER_SCHEME_PATH)/.git
 
-SWAG_PREFIX = swag
-SWAG_APP_PATH = apps/$(SWAG_PREFIX)
-SWAG_APP_TARGET = $(SWAG_APP_PATH)/rebar.config
+SWAGGER_SERVER_PATH = apps/swag_server
+SWAGGER_CLIENT_PATH = apps/swag_client
 
-swag.generate: $(SWAG_APP_TARGET)
+generate:: swag.server.generate swag.client.generate
 
-swag.distclean:
-	rm -rfv $(SWAG_APP_PATH)
+swag.server.generate: $(SWAGGER_SERVER_PATH)
+swag.client.generate: $(SWAGGER_CLIENT_PATH)
 
-swag.regenerate: swag.distclean swag.generate
+distclean:: swag.server.distclean swag.client.distclean
 
-$(SWAG_APP_TARGET): $(SWAGGER_SCHEME)
+swag.server.distclean:
+	rm -rf $(SWAGGER_SERVER_PATH)
+swag.client.distclean:
+	rm -rf $(SWAGGER_CLIENT_PATH)
+
+$(SWAGGER_SERVER_PATH) $(SWAGGER_CLIENT_PATH): $(SWAGGER_SCHEME)
 	$(SWAGGER_CODEGEN) generate \
-		-i $(SWAGGER_SCHEME) \
-		-l erlang-server \
-		-o $(SWAG_APP_PATH) \
-		--additional-properties packageName=$(SWAG_PREFIX)
+		-i $^ \
+		-l $(if $(findstring server,$@),erlang-server,erlang-client) \
+		-o $@ \
+		--additional-properties packageName=$(notdir $(basename $@))

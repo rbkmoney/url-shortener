@@ -13,7 +13,8 @@ rel/example_project
 .DS_Store
 
 # generated
-apps/swag/*
+apps/swag_server
+apps/swag_client
 
 # rebar
 /_checkouts/

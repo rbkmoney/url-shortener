@@ -8,7 +8,7 @@
 -export_type([context/0]).
 -export_type([claims/0]).
 
--spec authorize_api_key(swag:operation_id(), swag:api_key()) ->
+-spec authorize_api_key(swag_server:operation_id(), swag_server:api_key()) ->
     {true, Context :: context()} | false.
 
 authorize_api_key(OperationID, ApiKey) ->
@@ -29,7 +29,7 @@ authorize_api_key(OperationID, ApiKey) ->
 log_auth_error(OperationID, Error) ->
     lager:info("API Key authorization failed for ~p due to ~p", [OperationID, Error]).
 
--spec parse_api_key(swag:api_key()) ->
+-spec parse_api_key(swag_server:api_key()) ->
     {ok, {bearer, Credentials :: binary()}} | {error, Reason :: atom()}.
 
 parse_api_key(ApiKey) ->
@@ -40,7 +40,7 @@ parse_api_key(ApiKey) ->
             {error, unsupported_auth_scheme}
     end.
 
--spec authorize_api_key(swag:operation_id(), Type :: atom(), Credentials :: binary()) ->
+-spec authorize_api_key(swag_server:operation_id(), Type :: atom(), Credentials :: binary()) ->
     {ok, context()} | {error, Reason :: atom()}.
 
 authorize_api_key(_OperationID, bearer, Token) ->

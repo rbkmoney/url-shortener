@@ -2,7 +2,7 @@
 
 %% Swagger handler
 
--behaviour(swag_logic_handler).
+-behaviour(swag_server_logic_handler).
 -export([authorize_api_key/2]).
 -export([handle_request/3]).
 
@@ -18,18 +18,18 @@
 %% TODO refactor in case of different classes of users using this API
 -define(REALM, <<"external">>).
 
--type operation_id() :: swag:operation_id().
--type request_ctx()  :: swag:request_context().
+-type operation_id() :: swag_server:operation_id().
+-type request_ctx()  :: swag_server:request_context().
 -type request_data() :: #{atom() | binary() => term()}.
 
--spec authorize_api_key(operation_id(), swag:api_key()) ->
+-spec authorize_api_key(operation_id(), swag_server:api_key()) ->
     Result :: false | {true, shortener_auth:context()}.
 
 authorize_api_key(OperationID, ApiKey) ->
     shortener_auth:authorize_api_key(OperationID, ApiKey).
 
 -spec handle_request(operation_id(), request_data(), request_ctx()) ->
-    {ok | error, swag_logic_handler:response()}.
+    {ok | error, swag_server_logic_handler:response()}.
 
 handle_request(OperationID, Req, Context) ->
     _ = lager:info("Processing request ~p", [OperationID]), % FIXME
@@ -61,7 +61,7 @@ get_auth_context(#{auth_context := AuthContext}) ->
 %%
 
 -spec process_request(operation_id(), request_data(), woody_context:ctx()) ->
-    {ok | error, swag_logic_handler:response()}.
+    {ok | error, swag_server_logic_handler:response()}.
 
 process_request(
     'ShortenUrl',
@@ -120,7 +120,7 @@ render_short_url(ID, Template) ->
     iolist_to_binary([
         genlib:to_binary(maps:get(scheme, Template)),
         <<"://">>,
-        genlib:to_binary(maps:get(host, Template)),
+        genlib:to_binary(maps:get(netloc, Template)),
         genlib:to_binary(maps:get(path, Template)),
         ID
     ]).
@@ -164,7 +164,7 @@ handle(Req1, St) ->
                 {<<"expires">>       , cowboy_clock:rfc1123({Date, Time})},
                 {<<"cache-control">> , <<"must-revalidate">>}
             ],
-            cowboy_req:reply(308, Headers, Req2);
+            cowboy_req:reply(301, Headers, Req2);
         {error, notfound} ->
             cowboy_req:reply(404, Req2)
     end,
