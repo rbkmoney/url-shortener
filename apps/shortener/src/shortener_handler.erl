@@ -39,8 +39,7 @@ handle_request(OperationID, Req, Context) ->
             ok ->
                 process_request(OperationID, Req, create_woody_ctx(Req, AuthContext));
             {error, forbidden} ->
-                % TODO should be ok actually
-                {error, {403, [], <<>>}}
+                {ok, {403, [], undefined}}
         end
     catch
         error:{woody_error, {Source, Class, Details}} ->
@@ -96,8 +95,8 @@ process_request(
             Slug = shortener_slug:create(SourceUrl, parse_timestamp(ExpiresAt), WoodyCtx),
             {ok, {201, [], construct_shortened_url(Slug)}};
         false ->
-            {error, {400, [], #{
-                <<"code">> => <<"invalid_source_url">>,
+            {ok, {400, [], #{
+                <<"code">> => <<"forbidden_source_url">>,
                 <<"message">> => <<"Source URL is forbidden">>
             }}}
     end;
@@ -111,7 +110,7 @@ process_request(
         {ok, Slug} ->
             {ok, {200, [], construct_shortened_url(Slug)}};
         {error, notfound} ->
-            {error, {404, [], #{<<"message">> => <<"Not found">>}}}
+            {error, {404, [], undefined}}
     end;
 
 process_request(
@@ -123,7 +122,7 @@ process_request(
         ok ->
             {ok, {204, [], undefined}};
         {error, notfound} ->
-            {error, {404, [], #{<<"message">> => <<"Not found">>}}}
+            {error, {404, [], undefined}}
     end.
 
 validate_source_url(SourceUrl) ->
