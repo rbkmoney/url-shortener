@@ -41,8 +41,8 @@ init([]) ->
     {ok, {
        {one_for_all, 0, 1},
        % TODO
-       get_processor_childspecs(genlib_app:env(?MODULE, api)) ++
-       get_api_childspecs(genlib_app:env(?MODULE, processor))
+       get_processor_childspecs(genlib_app:env(?MODULE, processor)) ++
+       get_api_childspecs(genlib_app:env(?MODULE, api))
     }}.
 
 get_processor_childspecs(Opts) ->

@@ -11,7 +11,7 @@
 
 -behaviour(woody_server_thrift_handler).
 
--define(NS, <<"shortener">>).
+-define(NS, <<"url-shortener">>).
 
 -export([handle_function/4]).
 
@@ -167,7 +167,7 @@ handle_signal_result(Result, Machine) ->
 
 construct_machine_change(Changes, #mg_stateproc_Machine{aux_state = AuxState}) ->
     #mg_stateproc_MachineStateChange{
-        events    = marshal_history(Changes),
+        events    = [marshal(event, [Changes])],
         aux_state = construct_aux_state(AuxState)
     }.
 
@@ -184,13 +184,8 @@ apply_action({set_timer, Timer}, CA) ->
 apply_action(remove, CA) ->
     CA#mg_stateproc_ComplexAction{remove = #mg_stateproc_RemoveAction{}}.
 
-%%
-
-marshal_history(V) ->
-    marshal({list, event}, V).
-
-unmarshal_history(V) ->
-    unmarshal({list, event}, V).
+unmarshal_history(H) ->
+    [unmarshal(event, E) || #mg_stateproc_Event{event_payload = E} <- H].
 
 %%
 
@@ -218,9 +213,13 @@ apply_change({created, Slug}, undefined) ->
 
 %%
 
-marshal(event, {created, #{source := Source, expires_at := ExpiresAt}}) ->
-    [1, marshal(string, Source), marshal(timestamp, ExpiresAt)];
+marshal(event, Changes) ->
+    {arr, [1, marshal({list, change}, Changes)]};
+marshal(change, {created, #{source := Source, expires_at := ExpiresAt}}) ->
+    {arr, [marshal(string, Source), marshal(timestamp, ExpiresAt)]};
 
+marshal({list, T}, V) ->
+    {arr, [marshal(T, E) || E <- V]};
 marshal(timestamp, V) ->
     marshal(string, V);
 marshal(string, V) ->
@@ -228,9 +227,13 @@ marshal(string, V) ->
 marshal(term, V) ->
     {bin, term_to_binary(V)}.
 
-unmarshal(event, [1, Source, ExpiresAt]) ->
-    {created, #{source => unmarshal(string, Source), expires_at => marshal(timestamp, ExpiresAt)}};
+unmarshal(event, {arr, [1, Changes]}) ->
+    unmarshal({list, change}, Changes);
+unmarshal(change, {arr, [Source, ExpiresAt]}) ->
+    {created, #{source => unmarshal(string, Source), expires_at => unmarshal(timestamp, ExpiresAt)}};
 
+unmarshal({list, T}, {arr, V}) ->
+    [unmarshal(T, E) || E <- V];
 unmarshal(timestamp, V) ->
     unmarshal(string, V);
 unmarshal(string, {str, V}) ->

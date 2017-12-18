@@ -21,7 +21,7 @@
 -type key()        :: #jose_jwk{}.
 -type token()      :: binary().
 -type claims()     :: #{binary() => term()}.
--type subject()    :: {subject_id(), capi_acl:t()}.
+-type subject()    :: {subject_id(), shortener_acl:t()}.
 -type subject_id() :: binary().
 -type t()          :: {subject(), claims()}.
 -type expiration()        ::
@@ -192,7 +192,7 @@ verify(Token) ->
     try
         {_, ExpandedToken} = jose_jws:expand(Token),
         #{<<"protected">> := ProtectedHeader} = ExpandedToken,
-        Header = capi_utils:base64url_to_map(ProtectedHeader),
+        Header = base64url_to_map(ProtectedHeader),
         Alg = get_alg(Header),
         KID = get_kid(Header),
         verify(KID, Alg, ExpandedToken)
@@ -236,7 +236,7 @@ validate_claims(Claims, [], Acc) ->
 
 get_result(SubjectID, {Roles, Claims}) ->
     try
-        Subject = {SubjectID, capi_acl:decode(Roles)},
+        Subject = {SubjectID, shortener_acl:decode(Roles)},
         {ok, {Subject, Claims}}
     catch
         error:{badarg, _} = Reason ->
@@ -309,6 +309,11 @@ set_signee(Keyname) ->
     insert_values(#{
         signee => {keyname, Keyname}
     }).
+
+%%
+
+base64url_to_map(V) when is_binary(V) ->
+    jsx:decode(base64url:decode(V), [return_maps]).
 
 %%
 
