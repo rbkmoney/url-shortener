@@ -53,7 +53,8 @@ create(Source, ExpiresAt, Attempt, Ctx) ->
 get(ID, Ctx) ->
     case get_machine_history(ID, Ctx) of
         {ok, History} ->
-            {ok, collapse_history(History)};
+            Slug = collapse_history(History),
+            {ok, Slug#{id => ID}};
         {error, #mg_stateproc_MachineNotFound{}} ->
             {error, notfound}
     end.
@@ -71,13 +72,21 @@ remove(ID, Ctx) ->
 
 %%
 
-construct_id(Source, ExpiresAt, _Attempt) ->
+construct_id(Source, ExpiresAt, 0) ->
+    %% NOTE
+    %% We are hashing input on the first attempt so the system entropy pool remains untouched
+    %% most of the time.
     SpaceSize = get_space_size(),
-    RandBytes = crypto:strong_rand_bytes(SpaceSize),
-    Message = <<Source/binary, ExpiresAt/binary, RandBytes/binary>>,
-    HashAlgo = get_hash_algorithm(),
-    <<Hash:SpaceSize/integer-unit:8, _/binary>> = crypto:hash(HashAlgo, Message),
-    genlib_format:format_int_base(Hash, 62).
+    Message = <<Source/binary, ExpiresAt/binary>>,
+    <<Hash:SpaceSize/integer-unit:8, _/binary>> = crypto:hash(get_hash_algorithm(), Message),
+    format_id(Hash);
+construct_id(_Source, _ExpiresAt, Attempt) when Attempt > 0 ->
+    SpaceSize = get_space_size(),
+    <<RandBytes:SpaceSize/integer-unit:8>> = crypto:strong_rand_bytes(SpaceSize),
+    format_id(RandBytes).
+
+format_id(ID) ->
+    genlib_format:format_int_base(ID, 62).
 
 get_hash_algorithm() ->
     {ok, V} = application:get_env(shortener, hash_algorithm), V.
@@ -157,7 +166,7 @@ handle_function('ProcessSignal', [
         #mg_stateproc_RepairSignal{arg = Args} ->
             handle_repair(unmarshal(term, Args), collapse_history(History), Ctx)
     end,
-    handle_signal_result(Result, Machine).
+    {ok, handle_signal_result(Result, Machine)}.
 
 handle_signal_result(Result, Machine) ->
     #mg_stateproc_SignalResult{
@@ -167,7 +176,7 @@ handle_signal_result(Result, Machine) ->
 
 construct_machine_change(Changes, #mg_stateproc_Machine{aux_state = AuxState}) ->
     #mg_stateproc_MachineStateChange{
-        events    = [marshal(event, [Changes])],
+        events    = [marshal(event, Changes)],
         aux_state = construct_aux_state(AuxState)
     }.
 
@@ -214,7 +223,7 @@ apply_change({created, Slug}, undefined) ->
 %%
 
 marshal(event, Changes) ->
-    {arr, [1, marshal({list, change}, Changes)]};
+    {arr, [{i, 1}, marshal({list, change}, Changes)]};
 marshal(change, {created, #{source := Source, expires_at := ExpiresAt}}) ->
     {arr, [marshal(string, Source), marshal(timestamp, ExpiresAt)]};
 
@@ -227,7 +236,7 @@ marshal(string, V) ->
 marshal(term, V) ->
     {bin, term_to_binary(V)}.
 
-unmarshal(event, {arr, [1, Changes]}) ->
+unmarshal(event, {arr, [{i, 1}, Changes]}) ->
     unmarshal({list, change}, Changes);
 unmarshal(change, {arr, [Source, ExpiresAt]}) ->
     {created, #{source => unmarshal(string, Source), expires_at => unmarshal(timestamp, ExpiresAt)}};

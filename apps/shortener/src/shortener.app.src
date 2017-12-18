@@ -14,7 +14,7 @@
         cowboy,
         cowboy_cors,
         cowboy_access_log,
-        swag,
+        swag_server,
         mg_proto,
         woody,
         woody_user_identity

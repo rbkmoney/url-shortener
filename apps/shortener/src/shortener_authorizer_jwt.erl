@@ -9,6 +9,7 @@
 % TODO
 % Extend interface to support proper keystore manipulation
 
+-export([issue/2]).
 -export([verify/1]).
 
 %%
@@ -173,6 +174,49 @@ construct_key(KID, JWK) ->
 
 %%
 
+-spec issue(t(), expiration()) ->
+    {ok, token()} |
+    {error,
+        nonexistent_signee
+    }.
+
+issue(Auth, Expiration) ->
+    case get_signee_key() of
+        Key = #{} ->
+            Claims = construct_final_claims(Auth, Expiration),
+            sign(Key, Claims);
+        undefined ->
+            {error, nonexistent_signee}
+    end.
+
+construct_final_claims({{Subject, ACL}, Claims}, Expiration) ->
+    maps:merge(
+        Claims#{
+            <<"jti">> => unique_id(),
+            <<"sub">> => Subject,
+            <<"exp">> => get_expires_at(Expiration)
+        },
+        encode_roles(shortener_acl:encode(ACL))
+    ).
+
+get_expires_at({lifetime, Lt}) ->
+    genlib_time:unow() + Lt;
+get_expires_at({deadline, Dl}) ->
+    Dl;
+get_expires_at(unlimited) ->
+    0.
+
+unique_id() ->
+    <<ID:64>> = snowflake:new(),
+    genlib_format:format_int_base(ID, 62).
+
+sign(#{kid := KID, jwk := JWK, signer := #{} = JWS}, Claims) ->
+    JWT = jose_jwt:sign(JWK, JWS#{<<"kid">> => KID}, Claims),
+    {_Modules, Token} = jose_jws:compact(JWT),
+    {ok, Token}.
+
+%%
+
 -spec verify(token()) ->
     {ok, t()} |
     {error,
@@ -283,9 +327,18 @@ check_expiration(C, V) ->
 
 %%
 
+encode_roles(Roles) ->
+    #{
+        <<"resource_access">> => #{
+            <<"url-shortener">> => #{
+                <<"roles">> => Roles
+            }
+        }
+    }.
+
 decode_roles(Claims = #{
     <<"resource_access">> := #{
-        <<"shortener">> := #{
+        <<"url-shortener">> := #{
             <<"roles">> := Roles
         }
     }
@@ -302,6 +355,9 @@ insert_key(Keyname, Key = #{kid := KID}) ->
         {kid, KID}         => Key
     }).
 
+get_key_by_name(Keyname) ->
+    lookup_value({keyname, Keyname}).
+
 get_key_by_kid(KID) ->
     lookup_value({kid, KID}).
 
@@ -310,6 +366,13 @@ set_signee(Keyname) ->
         signee => {keyname, Keyname}
     }).
 
+get_signee_key() ->
+    case lookup_value(signee) of
+        {keyname, Keyname} ->
+            get_key_by_name(Keyname);
+        undefined ->
+            undefined
+    end.
 %%
 
 base64url_to_map(V) when is_binary(V) ->
