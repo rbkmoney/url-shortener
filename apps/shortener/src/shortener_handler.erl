@@ -34,13 +34,22 @@ authorize_api_key(OperationID, ApiKey) ->
 
 handle_request(OperationID, Req, Context) ->
     try
-        WoodyCtx = create_context(Req, get_auth_context(Context)),
-        process_request(OperationID, Req, WoodyCtx)
+        AuthContext = get_auth_context(Context),
+        case shortener_auth:authorize_operation(OperationID, AuthContext) of
+            ok ->
+                process_request(OperationID, Req, create_woody_ctx(Req, AuthContext));
+            {error, forbidden} ->
+                % TODO should be ok actually
+                {error, {403, [], <<>>}}
+        end
+    catch
+        error:{woody_error, {Source, Class, Details}} ->
+            {error, handle_woody_error(Source, Class, Details)}
     after
         ok = scoper:remove_scope()
     end.
 
-create_context(#{'X-Request-ID' := RequestID}, AuthContext) ->
+create_woody_ctx(#{'X-Request-ID' := RequestID}, AuthContext) ->
     RpcID = woody_context:new_rpc_id(genlib:to_binary(RequestID)),
     WoodyCtx = woody_context:new(RpcID),
     woody_user_identity:put(collect_user_identity(AuthContext), WoodyCtx).
@@ -61,6 +70,13 @@ get_claim(ClaimName, {_Subject, Claims}, Default) ->
 
 get_auth_context(#{auth_context := AuthContext}) ->
     AuthContext.
+
+handle_woody_error(_Source, result_unexpected, _Details) ->
+    {500, [], <<>>};
+handle_woody_error(_Source, resource_unavailable, _Details) ->
+    {503, [], <<>>};
+handle_woody_error(_Source, result_unknown, _Details) ->
+    {504, [], <<>>}.
 
 %%
 
