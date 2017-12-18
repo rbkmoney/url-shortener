@@ -26,15 +26,19 @@
     Result :: false | {true, shortener_auth:context()}.
 
 authorize_api_key(OperationID, ApiKey) ->
+    ok = scoper:add_scope('swag.server', #{operation => OperationID}),
     shortener_auth:authorize_api_key(OperationID, ApiKey).
 
 -spec handle_request(operation_id(), request_data(), request_ctx()) ->
     {ok | error, swag_server_logic_handler:response()}.
 
 handle_request(OperationID, Req, Context) ->
-    _ = lager:info("Processing request ~p", [OperationID]), % FIXME
-    WoodyCtx = create_context(Req, get_auth_context(Context)),
-    process_request(OperationID, Req, WoodyCtx).
+    try
+        WoodyCtx = create_context(Req, get_auth_context(Context)),
+        process_request(OperationID, Req, WoodyCtx)
+    after
+        ok = scoper:remove_scope()
+    end.
 
 create_context(#{'X-Request-ID' := RequestID}, AuthContext) ->
     RpcID = woody_context:new_rpc_id(genlib:to_binary(RequestID)),
