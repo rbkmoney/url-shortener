@@ -3,7 +3,7 @@
 -export([child_spec/2]).
 
 -define(APP, shortener).
--define(DEFAULT_ACCEPTORS_POOLSIZE, 100).
+-define(DEFAULT_ACCEPTORS_POOLSIZE, 10).
 -define(DEFAULT_IP_ADDR, "::").
 -define(DEFAULT_PORT, 8080).
 
@@ -12,10 +12,8 @@
 child_spec(LogicHandler, Opts) ->
     {Transport, TransportOpts} = get_socket_transport(Opts),
     CowboyOpts = get_cowboy_config(LogicHandler, Opts),
-    Acceptors = maps:get(acceptors, Opts, ?DEFAULT_ACCEPTORS_POOLSIZE),
     ranch:child_spec(
         ?MODULE,
-        Acceptors,
         Transport,
         TransportOpts,
         cowboy_protocol,
@@ -25,7 +23,8 @@ child_spec(LogicHandler, Opts) ->
 get_socket_transport(Opts) ->
     {ok, IP} = inet:parse_address(maps:get(ip, Opts, ?DEFAULT_IP_ADDR)),
     Port     = maps:get(port, Opts, ?DEFAULT_PORT),
-    {ranch_tcp, [{ip, IP}, {port, Port}]}.
+    Acceptors = maps:get(acceptors, Opts, ?DEFAULT_ACCEPTORS_POOLSIZE),
+    {ranch_tcp, [{ip, IP}, {port, Port}, {num_acceptors, Acceptors}]}.
 
 get_cowboy_config(LogicHandler, Opts) ->
     ShortUrlTemplate = maps:get(short_url_template, Opts),
