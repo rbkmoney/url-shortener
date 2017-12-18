@@ -130,6 +130,7 @@ failed_authorization(C) ->
     Params = construct_params(<<"https://oops.io/">>),
     C1 = clean_api_auth_token(C),
     % TODO
+    % Schema should allow `401` explicitly
     {error, {invalid_response_code, 401}} = shorten_url(Params, C1),
     {error, {invalid_response_code, 401}} = delete_shortened_url(<<"42">>, C1),
     {error, {invalid_response_code, 401}} = get_shortened_url(<<"42">>, C1).

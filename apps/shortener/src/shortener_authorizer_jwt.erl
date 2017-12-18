@@ -1,3 +1,7 @@
+% TODO
+% Extend interface to support proper keystore manipulation. Refactor it into a more
+% general library along with `shortener_acl` and some parts of `shortener_auth`.
+
 -module(shortener_authorizer_jwt).
 
 %%
@@ -6,8 +10,6 @@
 -export([init/1]).
 
 -export([store_key/2]).
-% TODO
-% Extend interface to support proper keystore manipulation
 
 -export([issue/2]).
 -export([verify/1]).
