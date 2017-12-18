@@ -173,10 +173,14 @@ parse_timestamp(Timestamp) ->
 
 get_short_url_template() ->
     % TODO
+    % Teach the swagger-codegen bastard to behave and accept handler options
+    % upon initialization
     maps:get(short_url_template, genlib_app:env(shortener, api)).
 
 get_source_url_whitelist() ->
     % TODO
+    % Teach the swagger-codegen bastard to behave and accept handler options
+    % upon initialization
     maps:get(source_url_whitelist, genlib_app:env(shortener, api), []).
 
 %%
