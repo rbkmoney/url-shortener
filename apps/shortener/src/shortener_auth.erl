@@ -1,6 +1,7 @@
 -module(shortener_auth).
 
 -export([authorize_api_key/2]).
+-export([authorize_operation/2]).
 
 -type context() :: shortener_authorizer_jwt:t().
 -type claims()  :: shortener_authorizer_jwt:claims().
@@ -44,7 +45,23 @@ parse_api_key(ApiKey) ->
     {ok, context()} | {error, Reason :: atom()}.
 
 authorize_api_key(_OperationID, bearer, Token) ->
-    % NOTE
-    % We are knowingly delegating actual request authorization to the logic handler
-    % so we could gather more data to perform fine-grained access control.
     shortener_authorizer_jwt:verify(Token).
+
+-spec authorize_operation(swag_server:operation_id(), context()) ->
+    ok | {error, forbidden}.
+
+authorize_operation(OperationID, {{_SubjectID, ACL}, _Claims}) ->
+    Permissions = shortener_acl:match(['shortened-urls'], ACL),
+    case is_operation_permitted(OperationID, Permissions) of
+        true ->
+            ok;
+        false ->
+            {error, forbidden}
+    end.
+
+is_operation_permitted('ShortenUrl', Ps) ->
+    lists:member(write, Ps);
+is_operation_permitted('DeleteShortenedUrl', Ps) ->
+    lists:member(write, Ps);
+is_operation_permitted('GetShortenedUrl', Ps) ->
+    lists:member(read, Ps).

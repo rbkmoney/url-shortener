@@ -231,7 +231,7 @@ encode_permission(write) ->
 
 get_resource_hierarchy() ->
     #{
-        shortened_urls => #{}
+        'shortened-urls' => #{}
     }.
 
 delve(Resource, Hierarchy) ->

@@ -6,6 +6,9 @@
 -export([init_per_testcase/2]).
 -export([end_per_testcase/2]).
 
+-export([failed_authorization/1]).
+-export([insufficient_permissions/1]).
+-export([readonly_permissions/1]).
 -export([successful_redirect/1]).
 -export([successful_delete/1]).
 -export([fordidden_source_url/1]).
@@ -22,11 +25,17 @@
 -spec all() -> [test_case_name()].
 all() ->
     [
+
+        failed_authorization,
+        insufficient_permissions,
+        readonly_permissions,
+
         successful_redirect,
         successful_delete,
         fordidden_source_url,
         url_expired,
         always_unique_url
+
     ].
 
 -spec init_per_suite(config()) -> config().
@@ -95,9 +104,10 @@ end_per_suite(C) ->
 -spec init_per_testcase(test_case_name(), config()) ->
     config().
 init_per_testcase(Name, C) ->
-    UserID = genlib:to_binary(Name),
-    {ok, T} = shortener_authorizer_jwt:issue({{UserID, []}, #{}}, unlimited),
-    [{api_auth_token, T} | C].
+    set_api_auth_token(Name, [
+        {['shortened-urls'], read},
+        {['shortened-urls'], write}
+    ], C).
 
 -spec end_per_testcase(test_case_name(), config()) ->
     config().
@@ -106,11 +116,38 @@ end_per_testcase(_Name, _C) ->
 
 %%
 
+-spec failed_authorization(config()) -> _.
+-spec insufficient_permissions(config()) -> _.
+-spec readonly_permissions(config()) -> _.
+
 -spec successful_redirect(config()) -> _.
 -spec successful_delete(config()) -> _.
 -spec fordidden_source_url(config()) -> _.
 -spec url_expired(config()) -> _.
 -spec always_unique_url(config()) -> _.
+
+failed_authorization(C) ->
+    Params = construct_params(<<"https://oops.io/">>),
+    C1 = clean_api_auth_token(C),
+    % TODO
+    {error, {invalid_response_code, 401}} = shorten_url(Params, C1),
+    {error, {invalid_response_code, 401}} = delete_shortened_url(<<"42">>, C1),
+    {error, {invalid_response_code, 401}} = get_shortened_url(<<"42">>, C1).
+
+insufficient_permissions(C) ->
+    Params = construct_params(<<"https://oops.io/">>),
+    C1 = set_api_auth_token(insufficient_permissions, [], C),
+    % TODO
+    {error, {invalid_response_code, 403}} = shorten_url(Params, C1),
+    {error, {invalid_response_code, 403}} = delete_shortened_url(<<"42">>, C1),
+    {error, {invalid_response_code, 403}} = get_shortened_url(<<"42">>, C1).
+
+readonly_permissions(C) ->
+    Params = construct_params(<<"https://oops.io/">>),
+    {ok, 201, _, #{<<"id">> := ID}} = shorten_url(Params, C),
+    C1 = set_api_auth_token(readonly_permissions, [{['shortened-urls'], read}], C),
+    {ok, 200, _, #{<<"id">> := ID}} = get_shortened_url(ID, C1),
+    {error, {invalid_response_code, 403}} = delete_shortened_url(ID, C1).
 
 successful_redirect(C) ->
     SourceUrl = <<"https://example.com/">>,
@@ -164,6 +201,16 @@ construct_params(SourceUrl, Lifetime) ->
 
 %%
 
+set_api_auth_token(Name, ACL, C) ->
+    UserID = genlib:to_binary(Name),
+    {ok, T} = shortener_authorizer_jwt:issue({{UserID, shortener_acl:from_list(ACL)}, #{}}, unlimited),
+    lists:keystore(api_auth_token, 1, C, {api_auth_token, T}).
+
+clean_api_auth_token(C) ->
+    lists:keydelete(api_auth_token, 1, C).
+
+%%
+
 shorten_url(ShortenedUrlParams, C) ->
     swag_client_shortener_api:shorten_url(
         ?config(api_endpoint, C),
@@ -194,7 +241,12 @@ append_media_type(Params = #{header := Headers}) ->
     }}.
 
 append_auth(Params = #{header := Headers}, C) ->
-    Params#{header => Headers#{<<"Authorization">> => <<"Bearer ", (?config(api_auth_token, C))/binary>>}}.
+    case lists:keyfind(api_auth_token, 1, C) of
+        {api_auth_token, AuthToken} ->
+            Params#{header => Headers#{<<"Authorization">> => <<"Bearer ", AuthToken/binary>>}};
+        _ ->
+            Params
+    end.
 
 append_request_id(Params = #{header := Headers}) ->
     Params#{header => Headers#{<<"X-Request-ID">> => woody_context:new_req_id()}}.
