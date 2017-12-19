@@ -54,7 +54,7 @@ init_per_suite(C) ->
             {suppress_application_start_stop, true},
             {suppress_supervisor_start_stop, true},
             {handlers, [
-                {lager_common_test_backend, [debug, {lager_logstash_formatter, []}]}
+                {lager_common_test_backend, [warning, {lager_logstash_formatter, []}]}
             ]}
         ]) ++ genlib_app:start_application_with(scoper, [
             {storage, scoper_storage_lager}
@@ -129,11 +129,9 @@ end_per_testcase(_Name, _C) ->
 failed_authorization(C) ->
     Params = construct_params(<<"https://oops.io/">>),
     C1 = clean_api_auth_token(C),
-    % TODO
-    % Schema should allow `401` explicitly
-    {error, {invalid_response_code, 401}} = shorten_url(Params, C1),
-    {error, {invalid_response_code, 401}} = delete_shortened_url(<<"42">>, C1),
-    {error, {invalid_response_code, 401}} = get_shortened_url(<<"42">>, C1).
+    {ok, 401, _, _} = shorten_url(Params, C1),
+    {ok, 401, _, _} = delete_shortened_url(<<"42">>, C1),
+    {ok, 401, _, _} = get_shortened_url(<<"42">>, C1).
 
 insufficient_permissions(C) ->
     Params = construct_params(<<"https://oops.io/">>),
