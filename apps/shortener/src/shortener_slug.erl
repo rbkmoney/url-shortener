@@ -170,13 +170,13 @@ handle_function('ProcessSignal', [
 
 handle_signal_result(Result, Machine) ->
     #mg_stateproc_SignalResult{
-        change = construct_machine_change(maps:get(changes, Result, []), Machine),
+        change = construct_machine_change(maps:get(events, Result, []), Machine),
         action = construct_complex_action(maps:get(actions, Result, []))
     }.
 
-construct_machine_change(Changes, #mg_stateproc_Machine{aux_state = AuxState}) ->
+construct_machine_change(Events, #mg_stateproc_Machine{aux_state = AuxState}) ->
     #mg_stateproc_MachineStateChange{
-        events    = [marshal(event, Changes)],
+        events    = [marshal(event, E) || E <- Events],
         aux_state = construct_aux_state(AuxState)
     }.
 
@@ -200,7 +200,7 @@ unmarshal_history(H) ->
 
 handle_init(#{source := Source, expires_at := ExpiresAt}, _Ctx) ->
     #{
-        changes => [{created, #{source => Source, expires_at => ExpiresAt}}],
+        events => [{created, #{source => Source, expires_at => ExpiresAt}}],
         actions => [{set_timer, {deadline, ExpiresAt}}]
     }.
 
@@ -215,17 +215,15 @@ handle_repair(_Args, _State, _Ctx) ->
 %%
 
 collapse_history(History) ->
-    lists:foldl(fun apply_change/2, undefined, lists:flatten(History)).
+    lists:foldl(fun apply_event/2, undefined, History).
 
-apply_change({created, Slug}, undefined) ->
+apply_event({created, Slug}, undefined) ->
     Slug.
 
 %%
 
-marshal(event, Changes) ->
-    {arr, [{i, 1}, marshal({list, change}, Changes)]};
-marshal(change, {created, #{source := Source, expires_at := ExpiresAt}}) ->
-    {arr, [marshal(string, Source), marshal(timestamp, ExpiresAt)]};
+marshal(event, {created, #{source := Source, expires_at := ExpiresAt}}) ->
+    {arr, [{i, 1}, marshal(string, Source), marshal(timestamp, ExpiresAt)]};
 
 marshal({list, T}, V) ->
     {arr, [marshal(T, E) || E <- V]};
@@ -236,9 +234,7 @@ marshal(string, V) ->
 marshal(term, V) ->
     {bin, term_to_binary(V)}.
 
-unmarshal(event, {arr, [{i, 1}, Changes]}) ->
-    unmarshal({list, change}, Changes);
-unmarshal(change, {arr, [Source, ExpiresAt]}) ->
+unmarshal(event, {arr, [{i, 1}, Source, ExpiresAt]}) ->
     {created, #{source => unmarshal(string, Source), expires_at => unmarshal(timestamp, ExpiresAt)}};
 
 unmarshal({list, T}, {arr, V}) ->
