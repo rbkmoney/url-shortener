@@ -72,18 +72,11 @@ remove(ID, Ctx) ->
 
 %%
 
-construct_id(Source, ExpiresAt, 0) ->
-    %% NOTE
-    %% We are hashing input on the first attempt so the system entropy pool remains untouched
-    %% most of the time.
+construct_id(Source, ExpiresAt, Attempt) ->
     SpaceSize = get_space_size(),
-    Message = <<Source/binary, ExpiresAt/binary>>,
+    Message = <<Source/binary, ExpiresAt/binary, Attempt:SpaceSize/integer-unit:8>>,
     <<Hash:SpaceSize/integer-unit:8, _/binary>> = crypto:hash(get_hash_algorithm(), Message),
-    format_id(Hash);
-construct_id(_Source, _ExpiresAt, Attempt) when Attempt > 0 ->
-    SpaceSize = get_space_size(),
-    <<RandBytes:SpaceSize/integer-unit:8>> = crypto:strong_rand_bytes(SpaceSize),
-    format_id(RandBytes).
+    format_id(Hash).
 
 format_id(ID) ->
     genlib_format:format_int_base(ID, 62).
