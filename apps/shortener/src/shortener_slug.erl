@@ -218,8 +218,6 @@ apply_event({created, Slug}, undefined) ->
 marshal(event, {created, #{source := Source, expires_at := ExpiresAt}}) ->
     {arr, [{i, 1}, marshal(string, Source), marshal(timestamp, ExpiresAt)]};
 
-marshal({list, T}, V) ->
-    {arr, [marshal(T, E) || E <- V]};
 marshal(timestamp, V) ->
     marshal(string, V);
 marshal(string, V) ->
@@ -230,8 +228,6 @@ marshal(term, V) ->
 unmarshal(event, {arr, [{i, 1}, Source, ExpiresAt]}) ->
     {created, #{source => unmarshal(string, Source), expires_at => unmarshal(timestamp, ExpiresAt)}};
 
-unmarshal({list, T}, {arr, V}) ->
-    [unmarshal(T, E) || E <- V];
 unmarshal(timestamp, V) ->
     unmarshal(string, V);
 unmarshal(string, {str, V}) ->
