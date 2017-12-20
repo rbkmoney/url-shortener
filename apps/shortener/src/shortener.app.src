@@ -22,6 +22,6 @@
     {env, []},
     {modules, []},
     {maintainers, [
-        "Dmitry Manik <d.manik@rbkmoney.com>"
+        "Andrey Mayorov <a.mayorov@rbkmoney.com>"
     ]}
 ]}.
