@@ -17,7 +17,8 @@
         swag_server,
         mg_proto,
         woody,
-        woody_user_identity
+        woody_user_identity,
+        erl_health
     ]},
     {env, []},
     {modules, []},

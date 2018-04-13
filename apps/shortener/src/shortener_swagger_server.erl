@@ -1,17 +1,17 @@
 -module(shortener_swagger_server).
 
--export([child_spec/2]).
+-export([child_spec/3]).
 
 -define(APP, shortener).
 -define(DEFAULT_ACCEPTORS_POOLSIZE, 10).
 -define(DEFAULT_IP_ADDR, "::").
 -define(DEFAULT_PORT, 8080).
 
--spec child_spec(module(), map()) -> supervisor:child_spec().
+-spec child_spec(module(), map(), cowboy_router:routes()) -> supervisor:child_spec().
 
-child_spec(LogicHandler, Opts) ->
+child_spec(LogicHandler, Opts, AdditionalRoutes) ->
     {Transport, TransportOpts} = get_socket_transport(Opts),
-    CowboyOpts = get_cowboy_config(LogicHandler, Opts),
+    CowboyOpts = get_cowboy_config(LogicHandler, AdditionalRoutes, Opts),
     ranch:child_spec(
         ?MODULE,
         Transport,
@@ -26,10 +26,11 @@ get_socket_transport(Opts) ->
     Acceptors = maps:get(acceptors, Opts, ?DEFAULT_ACCEPTORS_POOLSIZE),
     {ranch_tcp, [{ip, IP}, {port, Port}, {num_acceptors, Acceptors}]}.
 
-get_cowboy_config(LogicHandler, Opts) ->
+get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
     ShortUrlTemplate = maps:get(short_url_template, Opts),
     ShortUrlPath = maps:get(path, ShortUrlTemplate),
     Routes = squash_routes(
+        AdditionalRoutes ++
         swag_server_router:get_paths(LogicHandler) ++
         [{'_', [{genlib:to_list(ShortUrlPath) ++ ":shortenedUrlID", shortener_handler, #{}}]}]
     ),
