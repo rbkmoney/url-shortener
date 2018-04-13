@@ -38,14 +38,15 @@ start_link() ->
 -spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 
 init([]) ->
+    HealthCheckers = genlib_app:env(?MODULE, health_checkers, []),
     {ok, {
        {one_for_all, 0, 1},
        % TODO
-       get_processor_childspecs(genlib_app:env(?MODULE, processor)) ++
-       get_api_childspecs(genlib_app:env(?MODULE, api))
+       get_processor_childspecs(genlib_app:env(?MODULE, processor), HealthCheckers) ++
+       get_api_childspecs(genlib_app:env(?MODULE, api), HealthCheckers)
     }}.
 
-get_processor_childspecs(Opts) ->
+get_processor_childspecs(Opts, HealthCheckers) ->
     {ok, IP} = inet:parse_address(maps:get(ip, Opts, "::")),
     [woody_server:child_spec(
         ?MODULE,
@@ -59,11 +60,13 @@ get_processor_childspecs(Opts) ->
                     {mg_proto_state_processing_thrift, 'Processor'},
                     shortener_slug
                 }}
-            ]
+            ],
+            additional_routes => [erl_health_handle:get_route(HealthCheckers)]
         }
     )].
 
-get_api_childspecs(Opts) ->
+get_api_childspecs(Opts, HealthCheckers) ->
     AuthorizerSpec = shortener_authorizer_jwt:get_child_spec(maps:get(authorizer, Opts)),
-    SwaggerServerSpec = shortener_swagger_server:child_spec(shortener_handler, Opts),
+    HealthRoutes = [{'_', [erl_health_handle:get_route(HealthCheckers)]}],
+    SwaggerServerSpec = shortener_swagger_server:child_spec(shortener_handler, Opts, HealthRoutes),
     [AuthorizerSpec, SwaggerServerSpec].
