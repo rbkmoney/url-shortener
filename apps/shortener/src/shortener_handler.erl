@@ -21,6 +21,7 @@
 -type operation_id() :: swag_server:operation_id().
 -type request_ctx()  :: swag_server:request_context().
 -type request_data() :: #{atom() | binary() => term()}.
+-type subject_id()   :: woody_user_identity:id().
 
 -spec authorize_api_key(operation_id(), swag_server:api_key()) ->
     Result :: false | {true, shortener_auth:context()}.
@@ -35,9 +36,12 @@ authorize_api_key(OperationID, ApiKey) ->
 handle_request(OperationID, Req, Context) ->
     try
         AuthContext = get_auth_context(Context),
-        case shortener_auth:authorize_operation(OperationID, AuthContext) of
+        WoodyCtx = create_woody_ctx(Req, AuthContext),
+        Slug = prefetch_slug(Req, WoodyCtx),
+        case shortener_auth:authorize_operation(OperationID, Slug, AuthContext) of
             ok ->
-                process_request(OperationID, Req, create_woody_ctx(Req, AuthContext));
+                SubjectID = get_subject_id(AuthContext),
+                process_request(OperationID, Req, Slug, SubjectID, WoodyCtx);
             {error, forbidden} ->
                 {ok, {403, [], undefined}}
         end
@@ -47,6 +51,18 @@ handle_request(OperationID, Req, Context) ->
     after
         ok = scoper:remove_scope()
     end.
+
+-spec prefetch_slug(request_data(), woody_context:ctx()) -> shortener_slug:slug() | no_slug.
+
+prefetch_slug(#{'shortenedUrlID' := ID}, WoodyCtx) ->
+    case shortener_slug:get(ID, WoodyCtx) of
+        {ok, Slug} ->
+            Slug;
+        {error, notfound} ->
+            no_slug
+    end;
+prefetch_slug(_Req, _WoodyCtx) ->
+    no_slug.
 
 create_woody_ctx(#{'X-Request-ID' := RequestID}, AuthContext) ->
     RpcID = woody_context:new_rpc_id(genlib:to_binary(RequestID)),
@@ -79,7 +95,7 @@ handle_woody_error(_Source, result_unknown, _Details) ->
 
 %%
 
--spec process_request(operation_id(), request_data(), woody_context:ctx()) ->
+-spec process_request(operation_id(), request_data(), shortener_slug:slug(), subject_id(), woody_context:ctx()) ->
     {ok | error, swag_server_logic_handler:response()}.
 
 process_request(
@@ -88,11 +104,13 @@ process_request(
         <<"sourceUrl">> := SourceUrl,
         <<"expiresAt">> := ExpiresAt
     }},
+    no_slug,
+    SubjectID,
     WoodyCtx
 ) ->
     case validate_source_url(SourceUrl) of
         true ->
-            Slug = shortener_slug:create(SourceUrl, parse_timestamp(ExpiresAt), WoodyCtx),
+            Slug = shortener_slug:create(SourceUrl, parse_timestamp(ExpiresAt), SubjectID, WoodyCtx),
             {ok, {201, [], construct_shortened_url(Slug)}};
         false ->
             {ok, {400, [], #{
@@ -103,19 +121,26 @@ process_request(
 
 process_request(
     'GetShortenedUrl',
-    #{'shortenedUrlID' := ID},
-    WoodyCtx
+    _Req,
+    no_slug,
+    _SubjectID,
+    _WoodyCtx
 ) ->
-    case shortener_slug:get(ID, WoodyCtx) of
-        {ok, Slug} ->
-            {ok, {200, [], construct_shortened_url(Slug)}};
-        {error, notfound} ->
-            {error, {404, [], undefined}}
-    end;
+    {error, {404, [], undefined}};
+process_request(
+    'GetShortenedUrl',
+    _Req,
+    Slug,
+    _SubjectID,
+    _WoodyCtx
+) ->
+    {ok, {200, [], construct_shortened_url(Slug)}};
 
 process_request(
     'DeleteShortenedUrl',
     #{'shortenedUrlID' := ID},
+    _Slug,
+    _SubjectID,
     WoodyCtx
 ) ->
     case shortener_slug:remove(ID, WoodyCtx) of

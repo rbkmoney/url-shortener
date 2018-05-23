@@ -11,6 +11,8 @@
 -export([readonly_permissions/1]).
 -export([successful_redirect/1]).
 -export([successful_delete/1]).
+-export([other_subject_delete/1]).
+-export([other_subject_read/1]).
 -export([fordidden_source_url/1]).
 -export([url_expired/1]).
 -export([always_unique_url/1]).
@@ -32,6 +34,8 @@ all() ->
 
         successful_redirect,
         successful_delete,
+        other_subject_delete,
+        other_subject_read,
         fordidden_source_url,
         url_expired,
         always_unique_url
@@ -122,6 +126,8 @@ end_per_testcase(_Name, _C) ->
 
 -spec successful_redirect(config()) -> _.
 -spec successful_delete(config()) -> _.
+-spec other_subject_delete(config()) -> _.
+-spec other_subject_read(config()) -> _.
 -spec fordidden_source_url(config()) -> _.
 -spec url_expired(config()) -> _.
 -spec always_unique_url(config()) -> _.
@@ -161,6 +167,25 @@ successful_delete(C) ->
     {ok, 204, _, _} = delete_shortened_url(ID, C),
     {ok, 404, _, _} = get_shortened_url(ID, C),
     {ok, 404, _, _} = hackney:request(get, ShortUrl).
+
+other_subject_delete(C) ->
+    SourceUrl = <<"https://oops.io/">>,
+    Params = construct_params(SourceUrl),
+    Acl = [{['shortened-urls'], read}, {['shortened-urls'], write}],
+    C1 = set_api_auth_token(other_subject_delete_first, Acl, C),
+    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
+    C2 = set_api_auth_token(other_subject_delete_second, Acl, C1),
+    {ok, 403, _, _} = delete_shortened_url(ID, C2),
+    {ok, 301, Headers, _} = hackney:request(get, ShortUrl),
+    {<<"location">>, SourceUrl} = lists:keyfind(<<"location">>, 1, Headers).
+
+other_subject_read(C) ->
+    Params = construct_params(<<"https://oops.io/">>),
+    Acl = [{['shortened-urls'], read}, {['shortened-urls'], write}],
+    C1 = set_api_auth_token(other_subject_read_first, Acl, C),
+    {ok, 201, _, #{<<"id">> := ID}} = shorten_url(Params, C1),
+    C2 = set_api_auth_token(other_subject_read_second, Acl, C1),
+    {ok, 403, _, _} = get_shortened_url(ID, C2).
 
 fordidden_source_url(C) ->
     {ok, 201, _, #{}} = shorten_url(construct_params(<<"http://localhost/hack?id=42">>), C),
