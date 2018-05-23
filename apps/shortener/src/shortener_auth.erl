@@ -1,7 +1,7 @@
 -module(shortener_auth).
 
 -export([authorize_api_key/2]).
--export([authorize_operation/2]).
+-export([authorize_operation/3]).
 
 -type context() :: shortener_authorizer_jwt:t().
 -type claims()  :: shortener_authorizer_jwt:claims().
@@ -47,21 +47,35 @@ parse_api_key(ApiKey) ->
 authorize_api_key(_OperationID, bearer, Token) ->
     shortener_authorizer_jwt:verify(Token).
 
--spec authorize_operation(swag_server:operation_id(), context()) ->
-    ok | {error, forbidden}.
+-spec authorize_operation(OperationID, Slug, Context) -> ok | {error, forbidden} when
+    OperationID :: swag_server:operation_id(),
+    Slug :: shortener_slug:slug() | no_slug,
+    Context :: context().
 
-authorize_operation(OperationID, {{_SubjectID, ACL}, _Claims}) ->
+authorize_operation(OperationID, Slug, {{SubjectID, ACL}, _Claims}) ->
+    Owner = get_slug_owner(Slug),
     Permissions = shortener_acl:match(['shortened-urls'], ACL),
-    case is_operation_permitted(OperationID, Permissions) of
+    case is_operation_permitted(OperationID, SubjectID, Owner, Permissions) of
         true ->
             ok;
         false ->
             {error, forbidden}
     end.
 
-is_operation_permitted('ShortenUrl', Ps) ->
+-spec get_slug_owner(shortener_slug:slug() | no_slug) -> shortener_slug:owner() | undefined.
+
+get_slug_owner(no_slug) ->
+    undefined;
+get_slug_owner(#{owner := Owner}) ->
+    Owner.
+
+is_operation_permitted('ShortenUrl', _SubjectID, undefined, Ps) ->
     lists:member(write, Ps);
-is_operation_permitted('DeleteShortenedUrl', Ps) ->
+is_operation_permitted('DeleteShortenedUrl', _SubjectID, undefined, Ps) ->
     lists:member(write, Ps);
-is_operation_permitted('GetShortenedUrl', Ps) ->
-    lists:member(read, Ps).
+is_operation_permitted('DeleteShortenedUrl', SubjectID, Owner, Ps) ->
+    (SubjectID == Owner) and lists:member(write, Ps);
+is_operation_permitted('GetShortenedUrl', _SubjectID, undefined, Ps) ->
+    lists:member(read, Ps);
+is_operation_permitted('GetShortenedUrl', SubjectID, Owner, Ps) ->
+    (SubjectID == Owner) and lists:member(read, Ps).

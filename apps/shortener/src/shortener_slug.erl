@@ -3,7 +3,7 @@
 
 %% API
 
--export([create/3]).
+-export([create/4]).
 -export([get/2]).
 -export([remove/2]).
 
@@ -21,30 +21,35 @@
 
 -type id()         :: binary().
 -type source()     :: binary().
+-type owner()      :: binary().
 -type expiration() :: timestamp().
 
 -type slug()       :: #{
     id             => id(),
     source         => source(),
+    owner          => owner() | undefined,
     expires_at     => expiration()
 }.
+-export_type([slug/0]).
+-export_type([owner/0]).
 
 -type ctx()        :: woody_context:ctx().
 
--spec create(source(), expiration(), ctx()) ->
+
+-spec create(source(), expiration(), owner(), ctx()) ->
     slug().
 
-create(Source, ExpiresAt, Ctx) ->
-    create(Source, ExpiresAt, 0, Ctx).
+create(Source, ExpiresAt, Owner, Ctx) ->
+    create(Source, ExpiresAt, Owner, 0, Ctx).
 
-create(Source, ExpiresAt, Attempt, Ctx) ->
+create(Source, ExpiresAt, Owner, Attempt, Ctx) ->
     ID = construct_id(Source, ExpiresAt, Attempt),
-    Slug = #{source => Source, expires_at => ExpiresAt},
+    Slug = #{source => Source, expires_at => ExpiresAt, owner => Owner},
     case start_machine(ID, Slug, Ctx) of
         {ok, _} ->
             Slug#{id => ID};
         {error, #mg_stateproc_MachineAlreadyExists{}} ->
-            create(Source, ExpiresAt, Attempt + 1, Ctx)
+            create(Source, ExpiresAt, Owner, Attempt + 1, Ctx)
     end.
 
 -spec get(id(), ctx()) ->
@@ -191,9 +196,9 @@ unmarshal_history(H) ->
 
 %%
 
-handle_init(#{source := Source, expires_at := ExpiresAt}, _Ctx) ->
+handle_init(#{source := Source, expires_at := ExpiresAt, owner := Owner}, _Ctx) ->
     #{
-        events => [{created, #{source => Source, expires_at => ExpiresAt}}],
+        events => [{created, #{source => Source, expires_at => ExpiresAt, owner => Owner}}],
         actions => [{set_timer, {deadline, ExpiresAt}}]
     }.
 
@@ -215,8 +220,8 @@ apply_event({created, Slug}, undefined) ->
 
 %%
 
-marshal(event, {created, #{source := Source, expires_at := ExpiresAt}}) ->
-    {arr, [{i, 1}, marshal(string, Source), marshal(timestamp, ExpiresAt)]};
+marshal(event, {created, #{source := Source, expires_at := ExpiresAt, owner := Owner}}) ->
+    {arr, [{i, 2}, marshal(string, Source), marshal(timestamp, ExpiresAt), marshal(string, Owner)]};
 
 marshal(timestamp, V) ->
     marshal(string, V);
@@ -226,7 +231,13 @@ marshal(term, V) ->
     {bin, term_to_binary(V)}.
 
 unmarshal(event, {arr, [{i, 1}, Source, ExpiresAt]}) ->
-    {created, #{source => unmarshal(string, Source), expires_at => unmarshal(timestamp, ExpiresAt)}};
+    {created, #{source => unmarshal(string, Source),
+                expires_at => unmarshal(timestamp, ExpiresAt),
+                owner => undefined}};
+unmarshal(event, {arr, [{i, 2}, Source, ExpiresAt, Owner]}) ->
+    {created, #{source => unmarshal(string, Source),
+                expires_at => unmarshal(timestamp, ExpiresAt),
+                owner => unmarshal(string, Owner)}};
 
 unmarshal(timestamp, V) ->
     unmarshal(string, V);
