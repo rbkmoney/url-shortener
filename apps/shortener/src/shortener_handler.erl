@@ -37,7 +37,7 @@ handle_request(OperationID, Req, Context) ->
     try
         AuthContext = get_auth_context(Context),
         WoodyCtx = create_woody_ctx(Req, AuthContext),
-        {ok, Slug} = prefetch_slug(Req, WoodyCtx),
+        Slug = prefetch_slug(Req, WoodyCtx),
         case shortener_auth:authorize_operation(OperationID, Slug, AuthContext) of
             ok ->
                 SubjectID = get_subject_id(AuthContext),
@@ -52,17 +52,17 @@ handle_request(OperationID, Req, Context) ->
         ok = scoper:remove_scope()
     end.
 
--spec prefetch_slug(request_data(), woody_context:ctx()) -> {ok, shortener_slug:slug() | no_slug}.
+-spec prefetch_slug(request_data(), woody_context:ctx()) -> shortener_slug:slug() | no_slug.
 
 prefetch_slug(#{'shortenedUrlID' := ID}, WoodyCtx) ->
     case shortener_slug:get(ID, WoodyCtx) of
-        {ok, _Slug} = Result->
-            Result;
+        {ok, Slug} ->
+            Slug;
         {error, notfound} ->
-            {ok, no_slug}
+            no_slug
     end;
 prefetch_slug(_Req, _WoodyCtx) ->
-    {ok, no_slug}.
+    no_slug.
 
 create_woody_ctx(#{'X-Request-ID' := RequestID}, AuthContext) ->
     RpcID = woody_context:new_rpc_id(genlib:to_binary(RequestID)),

@@ -230,14 +230,18 @@ marshal(string, V) ->
 marshal(term, V) ->
     {bin, term_to_binary(V)}.
 
-unmarshal(event, {arr, [{i, 1}, Source, ExpiresAt]}) ->
-    {created, #{source => unmarshal(string, Source),
-                expires_at => unmarshal(timestamp, ExpiresAt),
-                owner => undefined}};
 unmarshal(event, {arr, [{i, 2}, Source, ExpiresAt, Owner]}) ->
-    {created, #{source => unmarshal(string, Source),
-                expires_at => unmarshal(timestamp, ExpiresAt),
-                owner => unmarshal(string, Owner)}};
+    {created, #{
+        source => unmarshal(string, Source),
+        expires_at => unmarshal(timestamp, ExpiresAt),
+        owner => unmarshal(string, Owner)
+    }};
+unmarshal(event, {arr, [{i, 1}, Source, ExpiresAt]}) ->
+    {created, #{
+        source => unmarshal(string, Source),
+        expires_at => unmarshal(timestamp, ExpiresAt),
+        owner => undefined
+    }};
 
 unmarshal(timestamp, V) ->
     unmarshal(string, V);
