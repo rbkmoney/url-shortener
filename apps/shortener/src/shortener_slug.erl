@@ -55,6 +55,8 @@ create(Source, ExpiresAt, Owner, Attempt, Ctx) ->
 -spec get(id(), ctx()) ->
     {ok, slug()} | {error, notfound}.
 
+get(<<"">>, _Ctx) ->
+    {error, notfound};
 get(ID, Ctx) ->
     case get_machine_history(ID, Ctx) of
         {ok, History} ->
