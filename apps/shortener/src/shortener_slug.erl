@@ -122,14 +122,7 @@ construct_descriptor(NS, ID, HistoryRange) ->
 issue_call(Method, Args, Context) ->
     ClientOpts0 = maps:get(automaton, genlib_app:env(shortener, service_clients)),
     ClientOpts1 = ClientOpts0#{event_handler => scoper_woody_event_handler},
-    CallResult = call_service(
-        {mg_proto_state_processing_thrift, 'Automaton'},
-        Method,
-        Args,
-        ClientOpts1,
-        Context
-    ),
-    case CallResult of
+    case call_service(automaton, Method, Args, ClientOpts1, Context) of
         {ok, _} = Ok ->
             Ok;
         {exception, #mg_stateproc_NamespaceNotFound{}} ->
@@ -140,24 +133,24 @@ issue_call(Method, Args, Context) ->
             {error, Exception}
     end.
 
-call_service(ModName, Method, Args, ClientOpts, Context) ->
-    Deadline = get_deadline(),
+call_service(Service, Method, Args, ClientOpts, Context) ->
+    Deadline = get_service_deadline(Service),
     DeadlineContext = set_deadline(Deadline, Context),
-    Retry = get_retry(Method),
-    call_service(ModName, Method, Args, ClientOpts, DeadlineContext, Retry).
-
-call_service(ModName, Method, Args, ClientOpts, Context, Retry) ->
-    Request = {ModName, Method, Args},
+    Retry = get_service_retry(Service, Method),
+    call_service(Service, Method, Args, ClientOpts, DeadlineContext, Retry).
+call_service(Service, Method, Args, ClientOpts, Context, Retry) ->
+    Request = {get_service_modname(Service), Method, Args},
     try
         woody_client:call(Request, ClientOpts, Context)
     catch
         error:{woody_error, {_Source, resource_unavailable, _Details}} = Error ->
             NextRetry = apply_retry_strategy(Retry, Error, Context),
-            call_service(ModName, Method, Args, ClientOpts, Context, NextRetry)
+            call_service(Service, Method, Args, ClientOpts, Context, NextRetry)
     end.
 
-get_deadline() ->
-    case genlib_app:env(shortener, deadline, undefined) of
+get_service_deadline(ServiceName) ->
+    ServiceDeadlines = genlib_app:env(shortener, service_deadlines, #{}),
+    case maps:get(ServiceName, ServiceDeadlines, undefined) of
         Timeout when is_integer(Timeout) andalso Timeout >= 0 ->
             woody_deadline:from_timeout(Timeout);
         undefined ->
@@ -172,8 +165,9 @@ set_deadline(Deadline, Context) ->
             Context
     end.
 
-get_retry(Method) ->
-    MethodReties = genlib_app:env(shortener, method_retries, #{}),
+get_service_retry(ServiceName, Method) ->
+    ServiceRetries = genlib_app:env(shortener, service_retries, #{}),
+    MethodReties = maps:get(ServiceName, ServiceRetries, #{}),
     DefaultRetry = maps:get('_', MethodReties, finish),
     maps:get(Method, MethodReties, DefaultRetry).
 
@@ -197,6 +191,11 @@ apply_retry_step({wait, Timeout, Retry}, Deadline0, Error) ->
             ok = timer:sleep(Timeout),
             Retry
 end.
+
+%%
+
+get_service_modname(automaton) ->
+    {mg_proto_state_processing_thrift, 'Automaton'}.
 
 %%
 

@@ -1,8 +1,11 @@
 -module(shortener_general_SUITE).
 
 -export([all/0]).
+-export([groups/0]).
 -export([init_per_suite/1]).
 -export([end_per_suite/1]).
+-export([init_per_group/2]).
+-export([end_per_group/2]).
 -export([init_per_testcase/2]).
 -export([end_per_testcase/2]).
 
@@ -17,6 +20,8 @@
 -export([url_expired/1]).
 -export([always_unique_url/1]).
 
+-export([woody_timeout_test/1]).
+
 %% tests descriptions
 
 -type config() :: [{atom(), term()}].
@@ -27,19 +32,28 @@
 -spec all() -> [test_case_name()].
 all() ->
     [
+        {group, general},
 
-        failed_authorization,
-        insufficient_permissions,
-        readonly_permissions,
+        woody_timeout_test
+    ].
 
-        successful_redirect,
-        successful_delete,
-        other_subject_delete,
-        other_subject_read,
-        fordidden_source_url,
-        url_expired,
-        always_unique_url
+-spec groups() -> [{atom(), list(), [test_case_name()]}].
 
+groups() ->
+    [
+        {general, [], [
+            failed_authorization,
+            insufficient_permissions,
+            readonly_permissions,
+
+            successful_redirect,
+            successful_delete,
+            other_subject_delete,
+            other_subject_read,
+            fordidden_source_url,
+            url_expired,
+            always_unique_url
+        ]}
     ].
 
 -spec init_per_suite(config()) -> config().
@@ -62,12 +76,25 @@ init_per_suite(C) ->
             ]}
         ]) ++ genlib_app:start_application_with(scoper, [
             {storage, scoper_storage_lager}
-        ]) ++ genlib_app:start_application_with(shortener, [
+        ]),
+    [
+        {suite_apps, Apps},
+        {api_endpoint, "http://" ++ Netloc},
+        {host, Host},
+        {port, Port},
+        {netloc, Netloc}
+    ] ++ C.
+
+-spec init_per_group(atom(), config()) -> config().
+
+init_per_group(general, C) ->
+    ShortenerApp =
+        genlib_app:start_application_with(shortener, [
             {space_size             , 8},
             {hash_algorithm         , sha256},
             {api, #{
                 ip                 => "::",
-                port               => Port,
+                port               => ?config(port, C),
                 authorizer         => #{
                     signee         => local,
                     keyset => #{
@@ -81,7 +108,7 @@ init_per_suite(C) ->
                 ],
                 short_url_template => #{
                     scheme         => http,
-                    netloc         => Netloc,
+                    netloc         => ?config(netloc, C),
                     path           => "/r/e/d/i/r/"
                 }
             }},
@@ -94,9 +121,13 @@ init_per_suite(C) ->
             }}
         ]),
     [
-        {suite_apps, Apps},
-        {api_endpoint, "http://" ++ Netloc}
+        {shortener_app, ShortenerApp}
     ] ++ C.
+
+-spec end_per_group(atom(), config()) -> _.
+
+end_per_group(general, C) ->
+    genlib_app:stop_unload_applications(?config(shortener_app, C)).
 
 get_keysource(Key, C) ->
     filename:join(?config(data_dir, C), Key).
@@ -107,11 +138,13 @@ end_per_suite(C) ->
 
 -spec init_per_testcase(test_case_name(), config()) ->
     config().
-init_per_testcase(Name, C) ->
+init_per_testcase(Name, C) when Name =/= woody_timeout_test ->
     set_api_auth_token(Name, [
         {['shortened-urls'], read},
         {['shortened-urls'], write}
-    ], C).
+    ], C);
+init_per_testcase(_Name, C) ->
+    C.
 
 -spec end_per_testcase(test_case_name(), config()) ->
     config().
@@ -221,6 +254,61 @@ construct_params(SourceUrl, Lifetime) ->
         <<"sourceUrl">> => SourceUrl,
         <<"expiresAt">> => format_ts(genlib_time:unow() + Lifetime)
     }.
+
+%%
+-spec woody_timeout_test(config()) -> _.
+
+woody_timeout_test(C) ->
+    Apps = genlib_app:start_application_with(shortener, [
+        {space_size             , 8},
+        {hash_algorithm         , sha256},
+        {api, #{
+            ip                 => "::",
+            port               => ?config(port, C),
+            authorizer         => #{
+                signee         => local,
+                keyset => #{
+                    local      => {pem_file, get_keysource("keys/local/private.pem", C)}
+                }
+            },
+            source_url_whitelist => [
+                "https://*"
+            ],
+            short_url_template => #{
+                scheme         => http,
+                netloc         => ?config(netloc, C),
+                path           => "/r/e/d/i/r/"
+            }
+        }},
+        {processor, #{
+            ip                 => "::",
+            port               => 8022
+        }},
+        {service_clients, #{
+            automaton          => #{url => <<"http://invalid_url:8022/v1/automaton">>}
+        }},
+        {service_deadlines, #{
+            automaton          => 5000 % milliseconds
+        }},
+        {service_retries, #{
+            automaton          => #{
+                'Start'   => {linear, 3, 1000},
+                '_'       => finish
+            }
+        }}
+    ]),
+    C2 = set_api_auth_token(woody_timeout_test, [
+        {['shortened-urls'], read},
+        {['shortened-urls'], write}
+    ], C),
+    SourceUrl = <<"https://example.com/">>,
+    Params = construct_params(SourceUrl),
+    {Time, {error, {invalid_response_code, 503}}} =
+        timer:tc(fun() ->
+            shorten_url(Params, C2)
+        end),
+    true = (Time >= 3000000),
+    genlib_app:stop_unload_applications(Apps).
 
 %%
 
