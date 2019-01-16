@@ -29,6 +29,35 @@
 
 -define(config(Key, C), (element(2, lists:keyfind(Key, 1, C)))).
 
+-define(shortener_config, [
+            {space_size             , 8},
+            {hash_algorithm         , sha256},
+            {api, #{
+                ip                 => "::",
+                port               => ?config(port, C),
+                authorizer         => #{
+                    signee         => local,
+                    keyset => #{
+                        local      => {pem_file, get_keysource("keys/local/private.pem", C)}
+                    }
+                },
+                source_url_whitelist => [
+                    "https://*",
+                    "ftp://*",
+                    "http://localhost/*"
+                ],
+                short_url_template => #{
+                    scheme         => http,
+                    netloc         => ?config(netloc, C),
+                    path           => "/r/e/d/i/r/"
+                }
+            }},
+            {processor, #{
+                ip                 => "::",
+                port               => 8022
+            }}
+        ]).
+
 -spec all() -> [test_case_name()].
 all() ->
     [
@@ -89,33 +118,7 @@ init_per_suite(C) ->
 
 init_per_group(general, C) ->
     ShortenerApp =
-        genlib_app:start_application_with(shortener, [
-            {space_size             , 8},
-            {hash_algorithm         , sha256},
-            {api, #{
-                ip                 => "::",
-                port               => ?config(port, C),
-                authorizer         => #{
-                    signee         => local,
-                    keyset => #{
-                        local      => {pem_file, get_keysource("keys/local/private.pem", C)}
-                    }
-                },
-                source_url_whitelist => [
-                    "https://*",
-                    "ftp://*",
-                    "http://localhost/*"
-                ],
-                short_url_template => #{
-                    scheme         => http,
-                    netloc         => ?config(netloc, C),
-                    path           => "/r/e/d/i/r/"
-                }
-            }},
-            {processor, #{
-                ip                 => "::",
-                port               => 8022
-            }},
+        genlib_app:start_application_with(shortener, ?shortener_config ++ [
             {service_clients, #{
                 automaton          => #{url => <<"http://machinegun:8022/v1/automaton">>}
             }}
@@ -259,31 +262,7 @@ construct_params(SourceUrl, Lifetime) ->
 -spec woody_timeout_test(config()) -> _.
 
 woody_timeout_test(C) ->
-    Apps = genlib_app:start_application_with(shortener, [
-        {space_size             , 8},
-        {hash_algorithm         , sha256},
-        {api, #{
-            ip                 => "::",
-            port               => ?config(port, C),
-            authorizer         => #{
-                signee         => local,
-                keyset => #{
-                    local      => {pem_file, get_keysource("keys/local/private.pem", C)}
-                }
-            },
-            source_url_whitelist => [
-                "https://*"
-            ],
-            short_url_template => #{
-                scheme         => http,
-                netloc         => ?config(netloc, C),
-                path           => "/r/e/d/i/r/"
-            }
-        }},
-        {processor, #{
-            ip                 => "::",
-            port               => 8022
-        }},
+    Apps = genlib_app:start_application_with(shortener, ?shortener_config ++ [
         {service_clients, #{
             automaton          => #{url => <<"http://invalid_url:8022/v1/automaton">>}
         }},
