@@ -29,35 +29,6 @@
 
 -define(config(Key, C), (element(2, lists:keyfind(Key, 1, C)))).
 
--define(shortener_config, [
-            {space_size             , 8},
-            {hash_algorithm         , sha256},
-            {api, #{
-                ip                 => "::",
-                port               => ?config(port, C),
-                authorizer         => #{
-                    signee         => local,
-                    keyset => #{
-                        local      => {pem_file, get_keysource("keys/local/private.pem", C)}
-                    }
-                },
-                source_url_whitelist => [
-                    "https://*",
-                    "ftp://*",
-                    "http://localhost/*"
-                ],
-                short_url_template => #{
-                    scheme         => http,
-                    netloc         => ?config(netloc, C),
-                    path           => "/r/e/d/i/r/"
-                }
-            }},
-            {processor, #{
-                ip                 => "::",
-                port               => 8022
-            }}
-        ]).
-
 -spec all() -> [test_case_name()].
 all() ->
     [
@@ -118,11 +89,12 @@ init_per_suite(C) ->
 
 init_per_group(general, C) ->
     ShortenerApp =
-        genlib_app:start_application_with(shortener, ?shortener_config ++ [
-            {service_clients, #{
-                automaton          => #{url => <<"http://machinegun:8022/v1/automaton">>}
-            }}
-        ]),
+        genlib_app:start_application_with(shortener, get_app_config(
+            ?config(port, C),
+            ?config(netloc, C),
+            get_keysource("keys/local/private.pem", C),
+            <<"http://machinegun:8022/v1/automaton">>
+        )),
     [
         {shortener_app, ShortenerApp}
     ] ++ C.
@@ -262,20 +234,12 @@ construct_params(SourceUrl, Lifetime) ->
 -spec woody_timeout_test(config()) -> _.
 
 woody_timeout_test(C) ->
-    Apps = genlib_app:start_application_with(shortener, ?shortener_config ++ [
-        {service_clients, #{
-            automaton          => #{url => <<"http://invalid_url:8022/v1/automaton">>}
-        }},
-        {service_deadlines, #{
-            automaton          => 5000 % milliseconds
-        }},
-        {service_retries, #{
-            automaton          => #{
-                'Start'   => {linear, 3, 1000},
-                '_'       => finish
-            }
-        }}
-    ]),
+    Apps = genlib_app:start_application_with(shortener, get_app_config(
+        ?config(port, C),
+        ?config(netloc, C),
+        get_keysource("keys/local/private.pem", C),
+        <<"http://invalid_url:8022/v1/automaton">>
+    )),
     C2 = set_api_auth_token(woody_timeout_test, [
         {['shortened-urls'], read},
         {['shortened-urls'], write}
@@ -344,3 +308,47 @@ append_request_id(Params = #{header := Headers}) ->
 format_ts(Ts) ->
     {ok, Result} = rfc3339:format(Ts, seconds),
     Result.
+
+%%
+
+get_app_config(Port, Netloc, PemFile, AutomatonUrl) ->
+    [
+        {space_size             , 8},
+        {hash_algorithm         , sha256},
+        {api, #{
+            ip                 => "::",
+            port               => Port,
+            authorizer         => #{
+                signee         => local,
+                keyset => #{
+                    local      => {pem_file, PemFile}
+                }
+            },
+            source_url_whitelist => [
+                "https://*",
+                "ftp://*",
+                "http://localhost/*"
+            ],
+            short_url_template => #{
+                scheme         => http,
+                netloc         => Netloc,
+                path           => "/r/e/d/i/r/"
+            }
+        }},
+        {processor, #{
+            ip                 => "::",
+            port               => 8022
+        }},
+        {service_clients, #{
+            automaton          => #{url => AutomatonUrl}
+        }},
+        {service_deadlines, #{
+            automaton          => 5000 % milliseconds
+        }},
+        {service_retries, #{
+            automaton          => #{
+                'Start'   => {linear, 3, 1000},
+                '_'       => finish
+            }
+        }}
+    ].
