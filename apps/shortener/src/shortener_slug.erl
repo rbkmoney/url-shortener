@@ -12,6 +12,7 @@
 -behaviour(woody_server_thrift_handler).
 
 -define(NS, <<"url-shortener">>).
+-define(DEFAULT_TIMEOUT, 5000).
 
 -export([handle_function/4]).
 
@@ -120,7 +121,7 @@ construct_descriptor(NS, ID, HistoryRange) ->
     }.
 
 issue_call(Method, Args, Context) ->
-    ClientOpts0 = maps:get(automaton, genlib_app:env(shortener, service_clients)),
+    ClientOpts0 = get_service_client_config(automaton),
     ClientOpts1 = ClientOpts0#{event_handler => scoper_woody_event_handler},
     case call_service(automaton, Method, Args, ClientOpts1, Context) of
         {ok, _} = Ok ->
@@ -149,13 +150,14 @@ call_service(Service, Method, Args, ClientOpts, Context, Retry) ->
     end.
 
 get_service_deadline(ServiceName) ->
-    ServiceDeadlines = genlib_app:env(shortener, service_deadlines, #{}),
-    case maps:get(ServiceName, ServiceDeadlines, undefined) of
-        Timeout when is_integer(Timeout) andalso Timeout >= 0 ->
-            woody_deadline:from_timeout(Timeout);
+    ServiceClient = get_service_client_config(ServiceName),
+    Timeout = case maps:get(deadline, ServiceClient, undefined) of
+        T when is_integer(T) andalso T >= 0 ->
+            T;
         undefined ->
-            undefined
-    end.
+            ?DEFAULT_TIMEOUT
+    end,
+    woody_deadline:from_timeout(Timeout).
 
 set_deadline(Deadline, Context) ->
     case woody_context:get_deadline(Context) of
@@ -166,8 +168,8 @@ set_deadline(Deadline, Context) ->
     end.
 
 get_service_retry(ServiceName, Method) ->
-    ServiceRetries = genlib_app:env(shortener, service_retries, #{}),
-    MethodReties = maps:get(ServiceName, ServiceRetries, #{}),
+    ServiceClient = get_service_client_config(ServiceName),
+    MethodReties = maps:get(retries, ServiceClient, #{}),
     DefaultRetry = maps:get('_', MethodReties, finish),
     maps:get(Method, MethodReties, DefaultRetry).
 
@@ -176,9 +178,6 @@ apply_retry_strategy(Retry, Error, Context) ->
 
 apply_retry_step(finish, _, Error) ->
     erlang:error(Error);
-apply_retry_step({wait, Timeout, Retry}, undefined, _) ->
-    ok = timer:sleep(Timeout),
-    Retry;
 apply_retry_step({wait, Timeout, Retry}, Deadline0, Error) ->
     Deadline1 = woody_deadline:from_unixtime_ms(
         woody_deadline:to_unixtime_ms(Deadline0) - Timeout
@@ -191,6 +190,10 @@ apply_retry_step({wait, Timeout, Retry}, Deadline0, Error) ->
             ok = timer:sleep(Timeout),
             Retry
 end.
+
+get_service_client_config(ServiceName) ->
+    ServiceClients = genlib_app:env(shortener, service_clients, #{}),
+    maps:get(ServiceName, ServiceClients, #{}).
 
 %%
 
