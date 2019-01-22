@@ -12,6 +12,7 @@
 -behaviour(woody_server_thrift_handler).
 
 -define(NS, <<"url-shortener">>).
+-define(DEFAULT_DEADLINE, 5000).
 
 -export([handle_function/4]).
 
@@ -120,10 +121,9 @@ construct_descriptor(NS, ID, HistoryRange) ->
     }.
 
 issue_call(Method, Args, Context) ->
-    Request = {{mg_proto_state_processing_thrift, 'Automaton'}, Method, Args},
-    ClientOpts0 = maps:get(automaton, genlib_app:env(shortener, service_clients)),
+    ClientOpts0 = get_service_client_config(automaton),
     ClientOpts1 = ClientOpts0#{event_handler => scoper_woody_event_handler},
-    case woody_client:call(Request, ClientOpts1, Context) of
+    case call_service(automaton, Method, Args, ClientOpts1, Context) of
         {ok, _} = Ok ->
             Ok;
         {exception, #mg_stateproc_NamespaceNotFound{}} ->
@@ -133,6 +133,67 @@ issue_call(Method, Args, Context) ->
         {exception, Exception} ->
             {error, Exception}
     end.
+
+call_service(Service, Method, Args, ClientOpts, Context) ->
+    Deadline = get_service_deadline(Service),
+    DeadlineContext = set_deadline(Deadline, Context),
+    Retry = get_service_retry(Service, Method),
+    call_service(Service, Method, Args, ClientOpts, DeadlineContext, Retry).
+call_service(Service, Method, Args, ClientOpts, Context, Retry) ->
+    Request = {get_service_modname(Service), Method, Args},
+    try
+        woody_client:call(Request, ClientOpts, Context)
+    catch
+        error:{woody_error, {_Source, resource_unavailable, _Details}} = Error ->
+            NextRetry = apply_retry_strategy(Retry, Error, Context),
+            call_service(Service, Method, Args, ClientOpts, Context, NextRetry)
+    end.
+
+get_service_deadline(ServiceName) ->
+    ServiceClient = get_service_client_config(ServiceName),
+    Timeout = maps:get(deadline, ServiceClient, ?DEFAULT_DEADLINE),
+    woody_deadline:from_timeout(Timeout).
+
+set_deadline(Deadline, Context) ->
+    case woody_context:get_deadline(Context) of
+        undefined ->
+            woody_context:set_deadline(Deadline, Context);
+        _AlreadySet ->
+            Context
+    end.
+
+get_service_retry(ServiceName, Method) ->
+    ServiceClient = get_service_client_config(ServiceName),
+    MethodReties = maps:get(retries, ServiceClient, #{}),
+    DefaultRetry = maps:get('_', MethodReties, finish),
+    maps:get(Method, MethodReties, DefaultRetry).
+
+apply_retry_strategy(Retry, Error, Context) ->
+    apply_retry_step(genlib_retry:next_step(Retry), woody_context:get_deadline(Context), Error).
+
+apply_retry_step(finish, _, Error) ->
+    erlang:error(Error);
+apply_retry_step({wait, Timeout, Retry}, Deadline0, Error) ->
+    Deadline1 = woody_deadline:from_unixtime_ms(
+        woody_deadline:to_unixtime_ms(Deadline0) - Timeout
+    ),
+    case woody_deadline:is_reached(Deadline1) of
+        true ->
+            % no more time for retries
+            erlang:error(Error);
+        false ->
+            ok = timer:sleep(Timeout),
+            Retry
+end.
+
+get_service_client_config(ServiceName) ->
+    ServiceClients = genlib_app:env(shortener, service_clients, #{}),
+    maps:get(ServiceName, ServiceClients, #{}).
+
+%%
+
+get_service_modname(automaton) ->
+    {mg_proto_state_processing_thrift, 'Automaton'}.
 
 %%
 
