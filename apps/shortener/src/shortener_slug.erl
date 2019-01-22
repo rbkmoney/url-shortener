@@ -12,7 +12,7 @@
 -behaviour(woody_server_thrift_handler).
 
 -define(NS, <<"url-shortener">>).
--define(DEFAULT_TIMEOUT, 5000).
+-define(DEFAULT_DEADLINE, 5000).
 
 -export([handle_function/4]).
 
@@ -151,12 +151,7 @@ call_service(Service, Method, Args, ClientOpts, Context, Retry) ->
 
 get_service_deadline(ServiceName) ->
     ServiceClient = get_service_client_config(ServiceName),
-    Timeout = case maps:get(deadline, ServiceClient, undefined) of
-        T when is_integer(T) andalso T >= 0 ->
-            T;
-        undefined ->
-            ?DEFAULT_TIMEOUT
-    end,
+    Timeout = maps:get(deadline, ServiceClient, ?DEFAULT_DEADLINE),
     woody_deadline:from_timeout(Timeout).
 
 set_deadline(Deadline, Context) ->
