@@ -12,9 +12,10 @@ rel/example_project
 
 .DS_Store
 
-# generated
-apps/swag_server
-apps/swag_client
+# generated 
+# temporary unignored
+#apps/swag_server
+#apps/swag_client
 
 # rebar
 /_checkouts/

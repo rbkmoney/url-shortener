@@ -2,13 +2,13 @@
 
 %% Swagger handler
 
--behaviour(swag_server_logic_handler).
+%-behaviour(swag_server_logic_handler).
 -export([authorize_api_key/2]).
 -export([handle_request/3]).
 
 %% Cowboy http handler
 
--behaviour(cowboy_http_handler).
+%-behaviour(cowboy_http_handler).
 -export([init/3]).
 -export([handle/2]).
 -export([terminate/3]).
