@@ -68,9 +68,9 @@ authorize_api_key(LogicHandler, OperationID, From, KeyParam, Req0) ->
     }.
 
 determine_peer(Req) ->
-    {Peer, Req1}  = cowboy_req:peer(Req),
-    {Value, Req2} = cowboy_req:header(<<"x-forwarded-for">>, Req1),
-    {determine_peer_from_header(Value, Peer), Req2}.
+    Peer  = cowboy_req:peer(Req),
+    Value = cowboy_req:header(<<"x-forwarded-for">>, Req),
+    {determine_peer_from_header(Value, Peer), Req}.
 
 -spec populate_request(Spec :: request_spec(), Req :: cowboy_req:req()) ->
     {ok,    Populated :: swag_server:object(),       Req :: cowboy_req:req()} |
@@ -93,7 +93,7 @@ validate_response(Spec, RespBody) ->
             erlang:error({response_validation_failed, Error, RespBody})
     end.
 
--spec encode_response(Resp :: swag_server_logic_handler:response()) ->
+-spec encode_response(Resp :: swag_server:response()) ->
     Encoded :: response().
 
 encode_response(Resp = {_, _, undefined}) ->
@@ -110,18 +110,15 @@ encode_response({Code, Headers, Body}) ->
     Req :: cowboy_req:req().
 
 process_response(ok, {Code, Headers, undefined}, Req0, _) ->
-    {ok, Req} = cowboy_req:reply(Code, Headers, Req0),
-    Req;
+    cowboy_req:reply(Code, Headers, Req0);
 process_response(ok, {Code, Headers, Body}, Req0, _) ->
-    {ok, Req} = cowboy_req:reply(Code, Headers, Body, Req0),
-    Req;
+    cowboy_req:reply(Code, Headers, Body, Req0);
 process_response(error, Message, Req0, OperationID) ->
     error_logger:info_msg(
         "Unable to process request for ~p: ~ts",
         [OperationID, Message]
     ),
-    {ok, Req} = cowboy_req:reply(400, [], Message, Req0),
-    Req.
+    cowboy_req:reply(400, #{}, Message, Req0).
 
 
 %% Internal
@@ -190,29 +187,28 @@ determine_peer_from_header(Value, _Peer) when is_binary(Value) ->
     {error, Message :: swag_server:error_reason(), Req :: cowboy_req:req()}.
 
 get_value(body, _Name, Req0) ->
-    {ok, Body, Req} = cowboy_req:body(Req0),
+    {ok, Body, Req} = swag_server_utils:get_body(Req0),
     case decode_body(Body) of
         {ok, Value} ->
             {ok, Value, Req};
         {error, Message} ->
             {error, Message, Req}
     end;
-get_value(qs_val, Name, Req0) ->
-    try cowboy_req:qs_vals(Req0) of
-        {QS, Req} ->
-            Value = swag_server_utils:get_opt(swag_server_utils:to_qs(Name), QS),
-            {ok, Value, Req}
+get_value(qs_val, Name, Req) ->
+    try
+        #{Name := Value} = cowboy_req:match_qs(Name, Req),
+        {ok, Value, Req}
     catch
         error:_ ->
             {error, <<"Invalid query">>}
     end;
-get_value(header, Name, Req0) ->
-    {Headers, Req} = cowboy_req:headers(Req0),
-    Value          = swag_server_utils:get_opt(swag_server_utils:to_header(Name), Headers),
+get_value(header, Name, Req) ->
+    Headers = cowboy_req:headers(Req), % map here
+    Value  = swag_server_utils:get_opt(swag_server_utils:to_header(Name), Headers),
     {ok, Value, Req};
-get_value(binding, Name, Req0) ->
-    {Bindings, Req} = cowboy_req:bindings(Req0),
-    Value           = swag_server_utils:get_opt(swag_server_utils:to_binding(Name), Bindings),
+get_value(binding, Name, Req) ->
+    Bindings = cowboy_req:bindings(Req),
+    Value = swag_server_utils:get_opt(swag_server_utils:to_binding(Name), Bindings),
     {ok, Value, Req}.
 
 -spec decode_body(Body :: binary()) ->

@@ -5,8 +5,7 @@
 
 %% Cowboy REST callbacks
 -export([allowed_methods/2]).
--export([init/3]).
--export([rest_init/2]).
+-export([init/2]).
 -export([allow_missing_post/2]).
 -export([content_types_accepted/2]).
 -export([content_types_provided/2]).
@@ -29,21 +28,15 @@
 
 -type state()              :: state().
 -type content_type()       :: {binary(), binary(), '*' | [{binary(), binary()}]}.
--type processed_response() :: {halt, cowboy_req:req(), state()}.
+-type processed_response() :: {stop, cowboy_req:req(), state()}.
 
 %% Cowboy REST callbacks
 
--spec init(TransportName :: atom(), Req :: cowboy_req:req(), Opts :: swag_server_router:init_opts()) ->
-    {upgrade, protocol, cowboy_rest, Req :: cowboy_req:req(), Opts :: swag_server_router:init_opts()}.
-
-init(_Transport, Req, Opts) ->
-    {upgrade, protocol, cowboy_rest, Req, Opts}.
-
--spec rest_init(Req :: cowboy_req:req(), Opts :: swag_server_router:init_opts()) ->
+-spec init(Req :: cowboy_req:req(), Opts :: swag_server_router:init_opts()) ->
     {ok, Req :: cowboy_req:req(), State :: state()}.
 
-rest_init(Req0, {Operations, LogicHandler}) ->
-    {Method, Req1} = cowboy_req:method(Req0),
+init(Req, {Operations, LogicHandler}) ->
+    Method = cowboy_req:method(Req),
     OperationID    = maps:get(Method, Operations, undefined),
 
     error_logger:info_msg("Attempt to process operation: ~p", [OperationID]),
@@ -53,8 +46,7 @@ rest_init(Req0, {Operations, LogicHandler}) ->
         logic_handler = LogicHandler,
         context       = #{}
     },
-
-    {ok, Req1, State}.
+    {cowboy_rest, Req, State}.
 
 -spec allowed_methods(Req :: cowboy_req:req(), State :: state()) ->
     {Value :: [binary()], Req :: cowboy_req:req(), State :: state()}.
@@ -324,7 +316,7 @@ encode_response(Resp) ->
 
 process_response(Status, Result, Req0, State = #state{operation_id = OperationID}) ->
     Req = swag_server_handler_api:process_response(Status, Result, Req0, OperationID),
-    {halt, Req, State}.
+    {stop, Req, State}.
 
 validate_headers(_, Req) ->
     {true, Req}.

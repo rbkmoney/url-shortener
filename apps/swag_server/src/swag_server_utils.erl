@@ -19,6 +19,8 @@
 -export([priv_path/1]).
 -export([join/1]).
 -export([join/2]).
+-export([get_body/1]).
+-export([get_body/2]).
 
 
 -spec to_binary(iodata() | atom() | number()) -> binary().
@@ -96,18 +98,15 @@ binary_to_existing_atom(Bin, Encoding) when is_binary(Bin) ->
             erlang:error(badarg)
     end.
 
--spec get_opt(any(), []) -> any().
+-spec get_opt(any(), #{}) -> any().
 
 get_opt(Key, Opts) ->
     get_opt(Key, Opts, undefined).
 
--spec get_opt(any(), [], any()) -> any().
+-spec get_opt(any(), #{}, any()) -> any().
 
 get_opt(Key, Opts, Default) ->
-    case lists:keyfind(Key, 1, Opts) of
-        {_, Value} -> Value;
-        false -> Default
-    end.
+    maps:get(Key, Opts, Default).
 
 -spec priv_dir() -> file:filename().
 
@@ -208,3 +207,20 @@ join_(_, [H]) ->
 
 join_(Delim, [H | T]) ->
     [H, Delim | join_(Delim, T)].
+
+% basically a woody_erlang copypaste
+-spec get_body(Req) -> {ok, binary(), Req} when Req::cowboy_req:req().
+get_body(Req) ->
+    get_body(Req, #{}).
+
+-spec get_body(Req, cowboy_req:read_body_opts()) -> {ok, binary(), Req} when Req::cowboy_req:req().
+get_body(Req, Opts) ->
+    do_get_body(<<>>, Req, Opts).
+
+do_get_body(Body, Req, Opts) ->
+    case cowboy_req:read_body(Req, Opts) of
+        {ok, Body1, Req1} ->
+            {ok, <<Body/binary, Body1/binary>>, Req1};
+        {more, Body1, Req1} ->
+            do_get_body(<<Body/binary, Body1/binary>>, Req1, Opts)
+    end.

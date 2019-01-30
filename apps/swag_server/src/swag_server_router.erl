@@ -16,7 +16,7 @@
 }.
 
 -type operation_spec() :: #{
-    path    := cowboy_router:route_match(),
+    path    := '_' | iodata(), % this type never existed
     method  := binary(),
     handler := module()
 }.
