@@ -72,7 +72,7 @@ test: submodules #generate
 	$(REBAR) ct
 
 # Swagger stuff
-SWAGGER_CODEGEN = java -jar /Users/I.toporkov/documents/swagger-codegen/modules/swagger-codegen-cli/target/swagger-codegen-cli.jar
+SWAGGER_CODEGEN = java -jar /Users/I.toporkov/documents/epic_erlang_21/swagger-codegen/modules/swagger-codegen-cli/target/swagger-codegen-cli.jar
 SWAGGER_SCHEME_PATH = schemes/swag-url-shortener
 SWAGGER_SCHEME = $(SWAGGER_SCHEME_PATH)/swagger.yaml
 

@@ -41,7 +41,6 @@ get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
         },
         middlewares => [
             cowboy_router,
-            % cowboy_cors, % might be replaced by shortener_cors
             cowboy_handler,
             shortener_cors
         ],
