@@ -86,11 +86,11 @@ get_auth_context(#{auth_context := AuthContext}) ->
     AuthContext.
 
 handle_woody_error(_Source, result_unexpected, _Details) ->
-    {500, [], <<>>};
+    {500, #{}, <<>>};
 handle_woody_error(_Source, resource_unavailable, _Details) ->
-    {503, [], <<>>};
+    {503, #{}, <<>>};
 handle_woody_error(_Source, result_unknown, _Details) ->
-    {504, [], <<>>}.
+    {504, #{}, <<>>}.
 
 %%
 
