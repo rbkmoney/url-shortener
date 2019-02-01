@@ -3,7 +3,7 @@
 %% Swagger handler
 
 -behaviour(swag_server_logic_handler).
--export([authorize_api_key/2]).
+-export([authorize_api_key/3]).
 -export([handle_request/4]).
 
 %% Cowboy http handler
@@ -22,10 +22,10 @@
 -type request_data() :: #{atom() | binary() => term()}.
 -type subject_id()   :: woody_user_identity:id().
 
--spec authorize_api_key(operation_id(), swag_server:api_key()) ->
+-spec authorize_api_key(operation_id(), swag_server:api_key(), swag_server:handler_opts()) ->
     Result :: false | {true, shortener_auth:context()}.
 
-authorize_api_key(OperationID, ApiKey) ->
+authorize_api_key(OperationID, ApiKey, _Opts) ->
     ok = scoper:add_scope('swag.server', #{operation => OperationID}),
     shortener_auth:authorize_api_key(OperationID, ApiKey).
 

@@ -40,8 +40,8 @@ get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
         },
         middlewares => [
             cowboy_router,
-            cowboy_handler,
-            shortener_cors
+            shortener_cors,
+            cowboy_handler
         ],
         stream_handlers => [cowboy_stream_h, cowboy_access_log_h],
         sink => shortener_access_lager_event
