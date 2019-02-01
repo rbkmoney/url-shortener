@@ -10,17 +10,17 @@ execute(Req, Env) ->
     Method = cowboy_req:method(ReqWithCorsHeaders),
 
     case Method of
-	<<"OPTIONS">> ->
-	    ReqFinal = cowboy_req:reply(200, ReqWithCorsHeaders),
-	    {stop, ReqFinal};
-	_ ->
-	    %% continue as normal
-	    {ok, ReqWithCorsHeaders, Env}
+    <<"OPTIONS">> ->
+        ReqFinal = cowboy_req:reply(200, ReqWithCorsHeaders),
+        {stop, ReqFinal};
+    _ ->
+        %% continue as normal
+        {ok, ReqWithCorsHeaders, Env}
     end.
 
 %% ===================================================================
 %% Helpers
-%% ===================================================================    
+%% ===================================================================
 
 set_cors_headers(Req) ->
     Headers = #{

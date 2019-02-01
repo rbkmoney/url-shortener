@@ -2,9 +2,9 @@
 
 %% Swagger handler
 
-%-behaviour(swag_server_logic_handler).
+-behaviour(swag_server_logic_handler).
 -export([authorize_api_key/2]).
--export([handle_request/3]).
+-export([handle_request/4]).
 
 %% Cowboy http handler
 
@@ -29,10 +29,10 @@ authorize_api_key(OperationID, ApiKey) ->
     ok = scoper:add_scope('swag.server', #{operation => OperationID}),
     shortener_auth:authorize_api_key(OperationID, ApiKey).
 
--spec handle_request(operation_id(), request_data(), request_ctx()) ->
+-spec handle_request(operation_id(), request_data(), request_ctx(), any()) ->
     {ok | error, swag_server:response()}.
 
-handle_request(OperationID, Req, Context) ->
+handle_request(OperationID, Req, Context, _Opts) ->
     try
         AuthContext = get_auth_context(Context),
         WoodyCtx = create_woody_ctx(Req, AuthContext),
@@ -216,7 +216,7 @@ get_source_url_whitelist() ->
 -spec init(request(), _) ->
     {ok, request(), state()}.
 
-init(Req, _Opts) ->
+init(Req, Opts) ->
     ID = cowboy_req:binding('shortenedUrlID', Req),
     Req = case shortener_slug:get(ID, woody_context:new()) of
         {ok, #{source := Source, expires_at := ExpiresAt}} ->
@@ -230,7 +230,7 @@ init(Req, _Opts) ->
         {error, notfound} ->
             cowboy_req:reply(404, Req)
     end,
-    {ok, Req, _Opts}.
+    {ok, Req, Opts}.
 
 -spec terminate(terminate_reason(), request(), state()) ->
     ok.
