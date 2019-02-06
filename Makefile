@@ -21,9 +21,10 @@ BUILD_IMAGE_TAG := ee0028263b7663828614e3a01764a836b4018193
 
 CALL_ANYWHERE := all submodules rebar-update compile xref lint dialyze start devrel release clean distclean
 
-#CALL_W_CONTAINER := $(CALL_ANYWHERE) test
+CALL_W_CONTAINER := $(CALL_ANYWHERE) test
 
 all: compile
+
 -include $(UTILS_PATH)/make_lib/utils_container.mk
 -include $(UTILS_PATH)/make_lib/utils_image.mk
 
@@ -39,7 +40,7 @@ submodules: $(SUBTARGETS)
 rebar-update:
 	$(REBAR) update
 
-compile: submodules rebar-update #generate
+compile: submodules rebar-update generate
 	$(REBAR) compile
 
 xref: submodules
@@ -57,7 +58,7 @@ start: submodules
 devrel: submodules
 	$(REBAR) release
 
-release: submodules #generate
+release: submodules generate
 	$(REBAR) as prod release
 
 clean::
@@ -68,11 +69,11 @@ distclean::
 	rm -rf _build
 
 # CALL_W_CONTAINER
-test: submodules #generate
+test: submodules generate
 	$(REBAR) ct
 
 # Swagger stuff
-SWAGGER_CODEGEN = java -jar /Users/I.toporkov/documents/epic_erlang_21/swagger-codegen/modules/swagger-codegen-cli/target/swagger-codegen-cli.jar
+SWAGGER_CODEGEN = $(call which, swagger-codegen)
 SWAGGER_SCHEME_PATH = schemes/swag-url-shortener
 SWAGGER_SCHEME = $(SWAGGER_SCHEME_PATH)/swagger.yaml
 

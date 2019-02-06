@@ -12,7 +12,7 @@ rel/example_project
 
 .DS_Store
 
-# generated 
+# generated
 apps/swag_server
 apps/swag_client
 
