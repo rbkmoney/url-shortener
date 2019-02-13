@@ -22,7 +22,7 @@
 -type request_data() :: #{atom() | binary() => term()}.
 -type subject_id()   :: woody_user_identity:id().
 
--spec authorize_api_key(operation_id(), swag_server:api_key(), swag_server:handler_opts()) ->
+-spec authorize_api_key(operation_id(), swag_server:api_key(), swag_server:handler_opts(_)) ->
     Result :: false | {true, shortener_auth:context()}.
 
 authorize_api_key(OperationID, ApiKey, _Opts) ->

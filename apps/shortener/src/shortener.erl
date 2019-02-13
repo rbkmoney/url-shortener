@@ -53,7 +53,7 @@ get_processor_childspecs(Opts, HealthCheckers) ->
         #{
             ip            => IP,
             port          => maps:get(port, Opts, 8022),
-            net_opts      => maps:get(net_opts, Opts, []),
+            % net_opts      => maps:get(net_opts, Opts, []), can't see us using it
             event_handler => scoper_woody_event_handler,
             handlers      => [
                 {"/v1/stateproc", {

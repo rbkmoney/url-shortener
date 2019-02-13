@@ -36,11 +36,12 @@ get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
     ),
     #{
         env => #{
-            dispatch => cowboy_router:compile(Routes)
+            dispatch => cowboy_router:compile(Routes),
+            cors_policy => shortener_cors_policy
         },
         middlewares => [
             cowboy_router,
-            shortener_cors,
+            cowboy_cors,
             cowboy_handler
         ],
         stream_handlers => [cowboy_stream_h, cowboy_access_log_h],
