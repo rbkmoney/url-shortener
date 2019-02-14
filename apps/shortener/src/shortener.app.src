@@ -12,6 +12,7 @@
         genlib,
         jose,
         cowboy,
+        cowboy_cors,
         cowboy_access_log,
         swag_server,
         mg_proto,
