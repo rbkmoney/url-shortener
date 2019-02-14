@@ -250,7 +250,7 @@ unsupported_cors_method(C) ->
 supported_cors_method(C) ->
     SourceUrl = <<"https://oops.io/">>,
     Params = construct_params(SourceUrl),
-    C1 = set_api_auth_token(unsupported_cors_method, [read, write], C),
+    C1 = set_api_auth_token(supported_cors_method, [read, write], C),
     {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
     ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"GET">>}],
     {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
@@ -262,7 +262,7 @@ supported_cors_method(C) ->
 supported_cors_header(C) ->
     SourceUrl = <<"https://oops.io/">>,
     Params = construct_params(SourceUrl),
-    C1 = set_api_auth_token(unsupported_cors_method, [read, write], C),
+    C1 = set_api_auth_token(supported_cors_header, [read, write], C),
     {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
     ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"GET">>}, {<<"access-control-request-headers">>, <<"content-type,authorization">>}],
     {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
@@ -273,7 +273,7 @@ supported_cors_header(C) ->
 unsupported_cors_header(C) ->
     SourceUrl = <<"https://oops.io/">>,
     Params = construct_params(SourceUrl),
-    C1 = set_api_auth_token(unsupported_cors_method, [read, write], C),
+    C1 = set_api_auth_token(unsupported_cors_header, [read, write], C),
     {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
     ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"GET">>}, {<<"access-control-request-headers">>, <<"content-type,42">>}],
     {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
