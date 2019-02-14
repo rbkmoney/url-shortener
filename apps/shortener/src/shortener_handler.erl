@@ -218,7 +218,7 @@ get_source_url_whitelist() ->
 
 init(Req, Opts) ->
     ID = cowboy_req:binding('shortenedUrlID', Req),
-    Req = case shortener_slug:get(ID, woody_context:new()) of
+    Req1 = case shortener_slug:get(ID, woody_context:new()) of
         {ok, #{source := Source, expires_at := ExpiresAt}} ->
             {ok, {Date, Time, _, _UndefinedButDialyzerDisagrees}} = rfc3339:parse(ExpiresAt),
             Headers = #{
@@ -230,7 +230,7 @@ init(Req, Opts) ->
         {error, notfound} ->
             cowboy_req:reply(404, Req)
     end,
-    {ok, Req, Opts}.
+    {ok, Req1, Opts}.
 
 -spec terminate(terminate_reason(), request(), state()) ->
     ok.

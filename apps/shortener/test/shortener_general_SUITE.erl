@@ -22,6 +22,11 @@
 
 -export([woody_timeout_test/1]).
 
+-export([unsupported_cors_method/1]).
+-export([supported_cors_method/1]).
+-export([unsupported_cors_header/1]).
+-export([supported_cors_header/1]).
+
 %% tests descriptions
 
 -type config() :: [{atom(), term()}].
@@ -33,7 +38,7 @@
 all() ->
     [
         {group, general},
-
+        {group, cors},
         woody_timeout_test
     ].
 
@@ -53,6 +58,12 @@ groups() ->
             fordidden_source_url,
             url_expired,
             always_unique_url
+        ]},
+        {cors, [], [
+            unsupported_cors_method,
+            supported_cors_method,
+            unsupported_cors_header,
+            supported_cors_header
         ]}
     ].
 
@@ -87,7 +98,7 @@ init_per_suite(C) ->
 
 -spec init_per_group(atom(), config()) -> config().
 
-init_per_group(general, C) ->
+init_per_group(_Group, C) ->
     ShortenerApp =
         genlib_app:start_application_with(shortener, get_app_config(
             ?config(port, C),
@@ -101,7 +112,7 @@ init_per_group(general, C) ->
 
 -spec end_per_group(atom(), config()) -> _.
 
-end_per_group(general, C) ->
+end_per_group(_Group, C) ->
     genlib_app:stop_unload_applications(?config(shortener_app, C)).
 
 get_keysource(Key, C) ->
@@ -219,6 +230,57 @@ always_unique_url(C) ->
     ]),
     N = length(lists:usort(IDs)),
     N = length(lists:usort(ShortUrls)).
+
+
+%% cors
+-spec unsupported_cors_method(config()) -> _.
+-spec supported_cors_method(config()) -> _.
+-spec unsupported_cors_header(config()) -> _.
+-spec supported_cors_header(config()) -> _.
+
+unsupported_cors_method(C) ->
+    SourceUrl = <<"https://oops.io/">>,
+    Params = construct_params(SourceUrl),
+    C1 = set_api_auth_token(unsupported_cors_method, [read, write], C),
+    {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
+    ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"PATCH">>}],
+    {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
+    false = lists:member(<<"access-control-allow-methods">>, Headers).
+
+supported_cors_method(C) ->
+    SourceUrl = <<"https://oops.io/">>,
+    Params = construct_params(SourceUrl),
+    C1 = set_api_auth_token(unsupported_cors_method, [read, write], C),
+    {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
+    ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"GET">>}],
+    {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
+    {Allowed, _} = shortener_cors_policy:allowed_methods(undefined, undefined),
+    {_, Returned} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
+    Allowed = binary:split(Returned, <<",">>, [global]).
+
+
+supported_cors_header(C) ->
+    SourceUrl = <<"https://oops.io/">>,
+    Params = construct_params(SourceUrl),
+    C1 = set_api_auth_token(unsupported_cors_method, [read, write], C),
+    {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
+    ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"GET">>}, {<<"access-control-request-headers">>, <<"content-type,authorization">>}],
+    {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
+    {Allowed, _} = shortener_cors_policy:allowed_headers(undefined, undefined),
+    {_, Returned} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    [_ | Allowed] = binary:split(Returned, <<",">>, [global]). % truncate origin
+
+unsupported_cors_header(C) ->
+    SourceUrl = <<"https://oops.io/">>,
+    Params = construct_params(SourceUrl),
+    C1 = set_api_auth_token(unsupported_cors_method, [read, write], C),
+    {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
+    ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"GET">>}, {<<"access-control-request-headers">>, <<"content-type,42">>}],
+    {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
+    false = lists:member(<<"access-control-allow-headers">>, Headers),
+    false = lists:member(<<"access-control-allow-credentials">>, Headers),
+    false = lists:member(<<"access-control-allow-methods">>, Headers),
+    false = lists:member(<<"access-control-allow-origin">>, Headers).
 
 construct_params(SourceUrl) ->
     construct_params(SourceUrl, 3600).
