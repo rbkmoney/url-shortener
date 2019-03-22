@@ -13,13 +13,15 @@ SERVICE_IMAGE_TAG ?= $(shell git rev-parse HEAD)
 SERVICE_IMAGE_PUSH_TAG ?= $(SERVICE_IMAGE_TAG)
 
 # Base image for the service
-BASE_IMAGE_NAME := service_erlang
-BASE_IMAGE_TAG := 16e2b3ef17e5fdefac8554ced9c2c74e5c6e9e11
+BASE_IMAGE_NAME := service-erlang
+BASE_IMAGE_TAG  := 06a42f38b3f01cbc9149d11e41b41991b31df911
 
 # Build image tag to be used
-BUILD_IMAGE_TAG := 8bd369361b0b43d960f757114846cf76056ee560
+BUILD_IMAGE_TAG := f3732d29a5e622aabf80542b5138b3631a726adb
 
 CALL_ANYWHERE := all submodules rebar-update compile xref lint dialyze start devrel release clean distclean
+
+REGISTRY := dr2.rbkmoney.com
 
 CALL_W_CONTAINER := $(CALL_ANYWHERE) test
 
