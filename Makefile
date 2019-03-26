@@ -21,8 +21,6 @@ BUILD_IMAGE_TAG := f3732d29a5e622aabf80542b5138b3631a726adb
 
 CALL_ANYWHERE := all submodules rebar-update compile xref lint dialyze start devrel release clean distclean
 
-REGISTRY := dr2.rbkmoney.com
-
 CALL_W_CONTAINER := $(CALL_ANYWHERE) test
 
 all: compile
