@@ -24,7 +24,7 @@ get_socket_transport(Opts) ->
     {ok, IP} = inet:parse_address(maps:get(ip, Opts, ?DEFAULT_IP_ADDR)),
     Port     = maps:get(port, Opts, ?DEFAULT_PORT),
     Acceptors = maps:get(acceptors, Opts, ?DEFAULT_ACCEPTORS_POOLSIZE),
-    {ranch_tcp, [{ip, IP}, {port, Port}, {num_acceptors, Acceptors}]}.
+    {ranch_tcp, #{socket_opts => [{ip, IP}, {port, Port}],  num_acceptors => Acceptors}}.
 
 get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
     ShortUrlTemplate = maps:get(short_url_template, Opts),
