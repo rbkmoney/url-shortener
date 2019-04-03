@@ -3,14 +3,13 @@
 %% Swagger handler
 
 -behaviour(swag_server_logic_handler).
--export([authorize_api_key/2]).
--export([handle_request/3]).
+-export([authorize_api_key/3]).
+-export([handle_request/4]).
 
 %% Cowboy http handler
 
--behaviour(cowboy_http_handler).
--export([init/3]).
--export([handle/2]).
+-behaviour(cowboy_handler).
+-export([init/2]).
 -export([terminate/3]).
 
 %%
@@ -23,17 +22,17 @@
 -type request_data() :: #{atom() | binary() => term()}.
 -type subject_id()   :: woody_user_identity:id().
 
--spec authorize_api_key(operation_id(), swag_server:api_key()) ->
+-spec authorize_api_key(operation_id(), swag_server:api_key(), swag_server:handler_opts(_)) ->
     Result :: false | {true, shortener_auth:context()}.
 
-authorize_api_key(OperationID, ApiKey) ->
+authorize_api_key(OperationID, ApiKey, _Opts) ->
     ok = scoper:add_scope('swag.server', #{operation => OperationID}),
     shortener_auth:authorize_api_key(OperationID, ApiKey).
 
--spec handle_request(operation_id(), request_data(), request_ctx()) ->
-    {ok | error, swag_server_logic_handler:response()}.
+-spec handle_request(operation_id(), request_data(), request_ctx(), any()) ->
+    {ok | error, swag_server:response()}.
 
-handle_request(OperationID, Req, Context) ->
+handle_request(OperationID, Req, Context, _Opts) ->
     try
         AuthContext = get_auth_context(Context),
         WoodyCtx = create_woody_ctx(Req, AuthContext),
@@ -43,7 +42,7 @@ handle_request(OperationID, Req, Context) ->
                 SubjectID = get_subject_id(AuthContext),
                 process_request(OperationID, Req, Slug, SubjectID, WoodyCtx);
             {error, forbidden} ->
-                {ok, {403, [], undefined}}
+                {ok, {403, #{}, undefined}}
         end
     catch
         error:{woody_error, {Source, Class, Details}} ->
@@ -87,16 +86,16 @@ get_auth_context(#{auth_context := AuthContext}) ->
     AuthContext.
 
 handle_woody_error(_Source, result_unexpected, _Details) ->
-    {500, [], <<>>};
+    {500, #{}, <<>>};
 handle_woody_error(_Source, resource_unavailable, _Details) ->
-    {503, [], <<>>};
+    {503, #{}, <<>>};
 handle_woody_error(_Source, result_unknown, _Details) ->
-    {504, [], <<>>}.
+    {504, #{}, <<>>}.
 
 %%
 
 -spec process_request(operation_id(), request_data(), shortener_slug:slug(), subject_id(), woody_context:ctx()) ->
-    {ok | error, swag_server_logic_handler:response()}.
+    {ok | error, swag_server:response()}.
 
 process_request(
     'ShortenUrl',
@@ -111,9 +110,9 @@ process_request(
     case validate_source_url(SourceUrl) of
         true ->
             Slug = shortener_slug:create(SourceUrl, parse_timestamp(ExpiresAt), SubjectID, WoodyCtx),
-            {ok, {201, [], construct_shortened_url(Slug)}};
+            {ok, {201, #{}, construct_shortened_url(Slug)}};
         false ->
-            {ok, {400, [], #{
+            {ok, {400, #{}, #{
                 <<"code">> => <<"forbidden_source_url">>,
                 <<"message">> => <<"Source URL is forbidden">>
             }}}
@@ -126,7 +125,7 @@ process_request(
     _SubjectID,
     _WoodyCtx
 ) ->
-    {error, {404, [], undefined}};
+    {error, {404, #{}, undefined}};
 process_request(
     'GetShortenedUrl',
     _Req,
@@ -134,7 +133,7 @@ process_request(
     _SubjectID,
     _WoodyCtx
 ) ->
-    {ok, {200, [], construct_shortened_url(Slug)}};
+    {ok, {200, #{}, construct_shortened_url(Slug)}};
 
 process_request(
     'DeleteShortenedUrl',
@@ -145,9 +144,9 @@ process_request(
 ) ->
     case shortener_slug:remove(ID, WoodyCtx) of
         ok ->
-            {ok, {204, [], undefined}};
+            {ok, {204, #{}, undefined}};
         {error, notfound} ->
-            {error, {404, [], undefined}}
+            {error, {404, #{}, undefined}}
     end.
 
 validate_source_url(SourceUrl) ->
@@ -214,30 +213,24 @@ get_source_url_whitelist() ->
 -type request()          :: cowboy_req:req().
 -type terminate_reason() :: {normal, shutdown} | {error, atom()}.
 
--spec init({atom(), http}, request(), _) ->
+-spec init(request(), _) ->
     {ok, request(), state()}.
 
-init({_, http}, Req, _Opts) ->
-    {ok, Req, undefined}.
-
--spec handle(request(), state()) ->
-    {ok, request(), state()}.
-
-handle(Req1, St) ->
-    {ID, Req2} = cowboy_req:binding('shortenedUrlID', Req1),
-    {ok, Req3} = case shortener_slug:get(ID, woody_context:new()) of
+init(Req, Opts) ->
+    ID = cowboy_req:binding('shortenedUrlID', Req),
+    Req1 = case shortener_slug:get(ID, woody_context:new()) of
         {ok, #{source := Source, expires_at := ExpiresAt}} ->
             {ok, {Date, Time, _, _UndefinedButDialyzerDisagrees}} = rfc3339:parse(ExpiresAt),
-            Headers = [
-                {<<"location">>      , Source},
-                {<<"expires">>       , cowboy_clock:rfc1123({Date, Time})},
-                {<<"cache-control">> , <<"must-revalidate">>}
-            ],
-            cowboy_req:reply(301, Headers, Req2);
+            Headers = #{
+                <<"location">>      => Source,
+                <<"expires">>       => cowboy_clock:rfc1123({Date, Time}),
+                <<"cache-control">> => <<"must-revalidate">>
+            },
+            cowboy_req:reply(301, Headers, Req);
         {error, notfound} ->
-            cowboy_req:reply(404, Req2)
+            cowboy_req:reply(404, Req)
     end,
-    {ok, Req3, St}.
+    {ok, Req1, Opts}.
 
 -spec terminate(terminate_reason(), request(), state()) ->
     ok.
