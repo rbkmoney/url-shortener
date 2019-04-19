@@ -6,7 +6,7 @@
     {applications, [
         kernel,
         stdlib,
-        lager_logstash_formatter,
+        logger_logstash_formatter,
         scoper,
         genlib,
         jose,

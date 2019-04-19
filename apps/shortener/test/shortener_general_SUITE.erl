@@ -77,7 +77,7 @@ init_per_suite(C) ->
     Netloc = Host ++ ":" ++ genlib:to_list(Port),
     Apps =
         genlib_app:start_application_with(scoper, [
-            {storage, scoper_storage_lager}
+            {storage, scoper_storage_logger}
         ]),
     [
         {suite_apps, Apps},
