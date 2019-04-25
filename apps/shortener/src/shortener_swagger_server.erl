@@ -44,8 +44,7 @@ get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
             cowboy_cors,
             cowboy_handler
         ],
-        stream_handlers => [cowboy_stream_h, cowboy_access_log_h],
-        sink => shortener_access_lager_event
+        stream_handlers => [cowboy_access_log_h, cowboy_stream_h]
     }.
 
 squash_routes(Routes) ->
