@@ -76,17 +76,8 @@ init_per_suite(C) ->
     Port = 8080,
     Netloc = Host ++ ":" ++ genlib:to_list(Port),
     Apps =
-        genlib_app:start_application_with(lager, [
-            {async_threshold, 1},
-            {async_threshold_window, 0},
-            {error_logger_hwm, 600},
-            {suppress_application_start_stop, true},
-            {suppress_supervisor_start_stop, true},
-            {handlers, [
-                {lager_common_test_backend, [warning, {lager_logstash_formatter, []}]}
-            ]}
-        ]) ++ genlib_app:start_application_with(scoper, [
-            {storage, scoper_storage_lager}
+        genlib_app:start_application_with(scoper, [
+            {storage, scoper_storage_logger}
         ]),
     [
         {suite_apps, Apps},
