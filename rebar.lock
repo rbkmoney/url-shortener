@@ -41,7 +41,7 @@
  {<<"lager">>,{pkg,<<"lager">>,<<"3.6.4">>},0},
  {<<"logger_logstash_formatter">>,
   {git,"git@github.com:rbkmoney/logger_logstash_formatter.git",
-       {ref,"17eaad7940c8df5a8c511388c6063bb049bab3d2"}},
+       {ref,"54c371215e3d73b2a868bc6375e523f95e826fe3"}},
   0},
  {<<"metrics">>,{pkg,<<"metrics">>,<<"1.0.1">>},1},
  {<<"mg_proto">>,
@@ -66,16 +66,16 @@
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.1">>},1},
  {<<"thrift">>,
   {git,"https://github.com/rbkmoney/thrift_erlang.git",
-       {ref,"240bbc842f6e9b90d01bd07838778cf48752b510"}},
+       {ref,"d393ef9cdb10f3d761ba3a603df2b2929dc19a10"}},
   1},
  {<<"unicode_util_compat">>,{pkg,<<"unicode_util_compat">>,<<"0.3.1">>},2},
  {<<"woody">>,
   {git,"git@github.com:rbkmoney/woody_erlang.git",
-       {ref,"698a84296742dba1ff338334b30193c019cc18cc"}},
+       {ref,"8a6822462ad052372b75c6404212ef350301bd4f"}},
   0},
  {<<"woody_user_identity">>,
   {git,"git@github.com:rbkmoney/woody_erlang_user_identity.git",
-       {ref,"fe973ab27fee9fc1cc39281e88816c7b6dce84c6"}},
+       {ref,"6eca18a62ccd7f0b3b62f9b2119b328b1798859d"}},
   0}]}.
 [
 {pkg_hash,[
