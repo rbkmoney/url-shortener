@@ -4,9 +4,9 @@
     {registered, []},
     {mod, {shortener, []}},
     {applications, [
+        logger_logstash_formatter,
         kernel,
         stdlib,
-        logger_logstash_formatter,
         scoper,
         genlib,
         jose,
