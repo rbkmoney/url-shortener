@@ -34,7 +34,7 @@ get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
         swag_server_router:get_paths(LogicHandler) ++
         [{'_', [{genlib:to_list(ShortUrlPath) ++ ":shortenedUrlID", shortener_handler, #{}}]}]
     ),
-    #{
+    CowboyOps = #{
         env => #{
             dispatch => cowboy_router:compile(Routes),
             cors_policy => shortener_cors_policy
@@ -45,7 +45,11 @@ get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
             cowboy_handler
         ],
         stream_handlers => [cowboy_access_log_h, cowboy_stream_h]
-    }.
+    },
+    cowboy_access_log_h:set_extra_info_fun(
+        mk_operation_id_getter(CowboyOps),
+        CowboyOps
+    ).
 
 squash_routes(Routes) ->
     orddict:to_list(lists:foldl(
@@ -53,3 +57,19 @@ squash_routes(Routes) ->
         orddict:new(),
         Routes
     )).
+
+mk_operation_id_getter(#{env := Env}) ->
+    fun (Req) ->
+        case cowboy_router:execute(Req, Env) of
+            {ok, _, #{handler_opts := {Operations, _Handler}}} ->
+                Method = cowboy_req:method(Req),
+                case maps:find(Method, Operations) of
+                    error ->
+                        #{};
+                    {ok, OperationID} ->
+                        #{operation_id => OperationID}
+                end;
+            _ ->
+                #{}
+        end
+    end.
