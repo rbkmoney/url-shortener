@@ -12,7 +12,7 @@
 child_spec(LogicHandler, Opts, AdditionalRoutes) ->
     {Transport, TransportOpts} = get_socket_transport(Opts),
     CowboyOpts = get_cowboy_config(LogicHandler, AdditionalRoutes, Opts),
-    CowboyOpts1 = cowboy_access_log_h:set_extra_info_fun(get_operation_id(CowboyOpts), CowboyOpts),
+    CowboyOpts1 = cowboy_access_log_h:set_extra_info_fun(mk_operation_id_getter(CowboyOpts), CowboyOpts),
     ranch:child_spec(
         ?MODULE,
         Transport,
@@ -55,15 +55,15 @@ squash_routes(Routes) ->
         Routes
     )).
 
-get_operation_id(#{env := Env}) ->
+mk_operation_id_getter(#{env := Env}) ->
     fun (Req) ->
         case cowboy_router:execute(Req, Env) of
             {ok, _, #{handler_opts := {Operations, _Handler}}} ->
                 Method = cowboy_req:method(Req),
-                case maps:get(Method, Operations, undefined) of
-                    undefined ->
+                case maps:find(Method, Operations) of
+                    error ->
                         #{};
-                    OperationID ->
+                    {ok, OperationID} ->
                         #{operation_id => OperationID}
                 end;
             _ ->
