@@ -12,13 +12,12 @@
 child_spec(LogicHandler, Opts, AdditionalRoutes) ->
     {Transport, TransportOpts} = get_socket_transport(Opts),
     CowboyOpts = get_cowboy_config(LogicHandler, AdditionalRoutes, Opts),
-    CowboyOpts1 = cowboy_access_log_h:set_extra_info_fun(mk_operation_id_getter(CowboyOpts), CowboyOpts),
     ranch:child_spec(
         ?MODULE,
         Transport,
         TransportOpts,
         cowboy_clear,
-        CowboyOpts1
+        CowboyOpts
     ).
 
 get_socket_transport(Opts) ->
@@ -35,7 +34,7 @@ get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
         swag_server_router:get_paths(LogicHandler) ++
         [{'_', [{genlib:to_list(ShortUrlPath) ++ ":shortenedUrlID", shortener_handler, #{}}]}]
     ),
-    #{
+    CowboyOps = #{
         env => #{
             dispatch => cowboy_router:compile(Routes),
             cors_policy => shortener_cors_policy
@@ -46,7 +45,11 @@ get_cowboy_config(LogicHandler, AdditionalRoutes, Opts) ->
             cowboy_handler
         ],
         stream_handlers => [cowboy_access_log_h, cowboy_stream_h]
-    }.
+    },
+    cowboy_access_log_h:set_extra_info_fun(
+        mk_operation_id_getter(CowboyOps),
+        CowboyOps
+    ).
 
 squash_routes(Routes) ->
     orddict:to_list(lists:foldl(
