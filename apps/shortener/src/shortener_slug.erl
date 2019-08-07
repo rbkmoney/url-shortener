@@ -235,14 +235,17 @@ handle_signal_result(Result, Machine) ->
 
 construct_machine_change(Events, #mg_stateproc_Machine{aux_state = AuxState}) ->
     #mg_stateproc_MachineStateChange{
-        events    = [marshal(event, E) || E <- Events],
+        events    = [construct_content(marshal(event, E)) || E <- Events],
         aux_state = construct_aux_state(AuxState)
     }.
 
 construct_aux_state(undefined) ->
-    {nl, #mg_msgpack_Nil{}};
+    construct_content({nl, #mg_msgpack_Nil{}});
 construct_aux_state(AuxState) ->
     AuxState.
+
+construct_content(Data) ->
+    #mg_stateproc_Content{data = Data}.
 
 construct_complex_action(Actions) ->
     lists:foldl(fun apply_action/2, #mg_stateproc_ComplexAction{}, Actions).
@@ -253,7 +256,7 @@ apply_action(remove, CA) ->
     CA#mg_stateproc_ComplexAction{remove = #mg_stateproc_RemoveAction{}}.
 
 unmarshal_history(H) ->
-    [unmarshal(event, E) || #mg_stateproc_Event{event_payload = E} <- H].
+    [unmarshal(event, E) || #mg_stateproc_Event{data = E} <- H].
 
 %%
 
