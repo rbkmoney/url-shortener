@@ -20,6 +20,8 @@
 -export([url_expired/1]).
 -export([always_unique_url/1]).
 
+-export([health_check_passing/1]).
+
 -export([woody_timeout_test/1]).
 
 -export([unsupported_cors_method/1]).
@@ -39,7 +41,8 @@ all() ->
     [
         {group, general},
         {group, cors},
-        woody_timeout_test
+        woody_timeout_test,
+        health_check_passing
     ].
 
 -spec groups() -> [{atom(), list(), [test_case_name()]}].
@@ -94,8 +97,7 @@ init_per_group(_Group, C) ->
         genlib_app:start_application_with(shortener, get_app_config(
             ?config(port, C),
             ?config(netloc, C),
-            get_keysource("keys/local/private.pem", C),
-            <<"http://machinegun:8022/v1/automaton">>
+            get_keysource("keys/local/private.pem", C)
         )),
     [
         {shortener_app, ShortenerApp}
@@ -303,6 +305,20 @@ woody_timeout_test(C) ->
     genlib_app:stop_unload_applications(Apps).
 
 %%
+-spec health_check_passing(config()) -> _.
+
+health_check_passing(C) ->
+    Apps = genlib_app:start_application_with(shortener, get_app_config(
+        ?config(port, C),
+        ?config(netloc, C),
+        get_keysource("keys/local/private.pem", C)
+    )),
+    Path = ?config(api_endpoint, C) ++ "/health",
+    {ok, 200, _, Payload} = hackney:request(get, Path, [], <<>>, [with_body]),
+    #{<<"service">> := <<"shortener">>} = jsx:decode(Payload, [return_maps]),
+    genlib_app:stop_unload_applications(Apps).
+
+%%
 set_api_auth_token(Name, Permissions, C) ->
     UserID = genlib:to_binary(Name),
     ACL = construct_shortener_acl(Permissions),
@@ -363,6 +379,9 @@ format_ts(Ts) ->
 
 %%
 
+get_app_config(Port, Netloc, PemFile) ->
+    get_app_config(Port, Netloc, PemFile, <<"http://machinegun:8022/v1/automaton">>).
+
 get_app_config(Port, Netloc, PemFile, AutomatonUrl) ->
     [
         {space_size             , 8},
@@ -390,6 +409,9 @@ get_app_config(Port, Netloc, PemFile, AutomatonUrl) ->
         {processor, #{
             ip                 => "::",
             port               => 8022
+        }},
+        {health_check, #{
+            service => {erl_health, service, [<<"shortener">>]}
         }},
         {service_clients, #{
             automaton => #{
