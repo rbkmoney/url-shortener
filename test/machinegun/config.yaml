@@ -1,3 +1,6 @@
+service_name: machinegun
+snowflake_machine_id: 42
+
 namespaces:
     url-shortener:
         processor:
