@@ -19,7 +19,7 @@
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.6.0">>},1},
  {<<"erl_health">>,
   {git,"https://github.com/rbkmoney/erlang-health.git",
-       {ref,"d8fb5f2c2a14f6180125fec414d394d89015fe6b"}},
+       {ref,"c190cb8de0359b933a27cd20ddc74180c0e5f5c4"}},
   0},
  {<<"folsom">>,
   {git,"git@github.com:folsom-project/folsom.git",
