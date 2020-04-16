@@ -182,15 +182,8 @@ render_short_url(ID, Template) ->
     ]).
 
 parse_timestamp(Timestamp) ->
-    MicroSeconds = genlib_rfc3339:parse(Timestamp, microsecond),
-    {Time, Unit} =
-        case MicroSeconds rem 1000000 of
-            0 ->
-                {erlang:convert_time_unit(MicroSeconds, microsecond, second), second};
-            _ ->
-                {MicroSeconds, microsecond}
-        end,
-    genlib_rfc3339:format(Time, Unit).
+    Seconds = genlib_rfc3339:parse(Timestamp, second),
+    genlib_rfc3339:format(Seconds, second).
 
 get_short_url_template() ->
     % TODO
