@@ -182,18 +182,8 @@ render_short_url(ID, Template) ->
     ]).
 
 parse_timestamp(Timestamp) ->
-    {ok, {Date, Time, Usec, TZOffset}} = rfc3339:parse(Timestamp),
-    Seconds = calendar:datetime_to_gregorian_seconds({Date, Time}),
-    {DateUTC, TimeUTC} = calendar:gregorian_seconds_to_datetime(
-        case TZOffset of
-            _ when is_integer(TZOffset) ->
-                Seconds - (60 * TZOffset);
-            _ ->
-                Seconds
-        end
-    ),
-    {ok, TimestampUTC} = rfc3339:format({DateUTC, TimeUTC, Usec, 0}),
-    TimestampUTC.
+    Seconds = genlib_rfc3339:parse(Timestamp, second),
+    genlib_rfc3339:format(Seconds, second).
 
 get_short_url_template() ->
     % TODO
@@ -220,7 +210,8 @@ init(Req, Opts) ->
     ID = cowboy_req:binding('shortenedUrlID', Req),
     Req1 = case shortener_slug:get(ID, woody_context:new()) of
         {ok, #{source := Source, expires_at := ExpiresAt}} ->
-            {ok, {Date, Time, _, _UndefinedButDialyzerDisagrees}} = rfc3339:parse(ExpiresAt),
+            Seconds = genlib_rfc3339:parse(ExpiresAt, second),
+            {Date, Time} = calendar:system_time_to_universal_time(Seconds, second),
             Headers = #{
                 <<"location">>      => Source,
                 <<"expires">>       => cowboy_clock:rfc1123({Date, Time}),

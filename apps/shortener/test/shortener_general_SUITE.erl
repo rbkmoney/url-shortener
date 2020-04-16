@@ -374,8 +374,7 @@ append_request_id(Params = #{header := Headers}) ->
     Params#{header => Headers#{<<"X-Request-ID">> => woody_context:new_req_id()}}.
 
 format_ts(Ts) ->
-    {ok, Result} = rfc3339:format(Ts, seconds),
-    Result.
+    genlib_rfc3339:format(Ts, second).
 
 %%
 
