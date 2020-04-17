@@ -183,7 +183,7 @@ render_short_url(ID, Template) ->
 
 parse_timestamp(Timestamp) ->
     Seconds = genlib_rfc3339:parse(Timestamp, second),
-    genlib_rfc3339:format(Seconds, second).
+    genlib_rfc3339:format_relaxed(Seconds, second).
 
 get_short_url_template() ->
     % TODO
