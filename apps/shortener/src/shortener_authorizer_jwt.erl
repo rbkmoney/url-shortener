@@ -322,9 +322,9 @@ check_expiration(_, Exp) when is_integer(Exp) ->
         % Expiration check is disabled.
         % See MSPF-563 for details
         _Now ->
-            Exp;
-        _ ->
-            throw({invalid_token, expired})
+            Exp
+        % _ ->
+        %     throw({invalid_token, expired})
     end;
 check_expiration(C, undefined) ->
     throw({invalid_token, {missing, C}});
