@@ -1,6 +1,7 @@
 service_name: machinegun
 snowflake_machine_id: 42
-
+erlang:
+    secret_cookie_file: "/opt/machinegun/etc/cookie"
 namespaces:
     url-shortener:
         processor:
