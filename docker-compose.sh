@@ -15,10 +15,11 @@ services:
         condition: service_healthy
 
   machinegun:
-    image: dr2.rbkmoney.com/rbkmoney/machinegun:5b85e3c73041e5cbcfcc35c465cf14214163389b
+    image: dr2.rbkmoney.com/rbkmoney/machinegun:b366973cec80a4d326840660405e50a3cac6cded
     command: /opt/machinegun/bin/machinegun foreground
     volumes:
       - ./test/machinegun/config.yaml:/opt/machinegun/etc/config.yaml
+      - ./test/machinegun/cookie:/opt/machinegun/etc/cookie
     healthcheck:
       test: "curl http://localhost:8022/"
       interval: 5s
