@@ -96,10 +96,10 @@ get_space_size() ->
 %%
 
 start_machine(ID, Args, Ctx) ->
-    issue_call('Start', [?NS, ID, marshal(term, Args)], Ctx).
+    issue_call('Start', {?NS, ID, marshal(term, Args)}, Ctx).
 
 get_machine_history(ID, Ctx) ->
-    Result = issue_call('GetMachine', [construct_descriptor(?NS, ID)], Ctx),
+    Result = issue_call('GetMachine', {construct_descriptor(?NS, ID)}, Ctx),
     case Result of
         {ok, #mg_stateproc_Machine{history = History}} ->
             {ok, unmarshal_history(History)};
@@ -108,13 +108,13 @@ get_machine_history(ID, Ctx) ->
     end.
 
 remove_machine(ID, Ctx) ->
-    issue_call('Remove', [?NS, ID], Ctx).
+    issue_call('Remove', {?NS, ID}, Ctx).
 
 construct_descriptor(NS, ID) ->
     construct_descriptor(NS, ID, #mg_stateproc_HistoryRange{}).
 
 construct_descriptor(NS, ID, HistoryRange) ->
-    #'mg_stateproc_MachineDescriptor'{
+    #mg_stateproc_MachineDescriptor{
         ns = NS,
         ref = {id, ID},
         range = HistoryRange
@@ -201,7 +201,7 @@ get_service_modname(automaton) ->
 -type signal_result() :: mg_proto_state_processing_thrift:'SignalResult'().
 
 -spec handle_function
-    ('ProcessSignal', [signal()], ctx(), woody:options()) ->
+    ('ProcessSignal', {signal()}, ctx(), woody:options()) ->
         {ok, signal_result()} | no_return().
 
 handle_function(Func, Args, Ctx, _Opts) ->
@@ -209,12 +209,12 @@ handle_function(Func, Args, Ctx, _Opts) ->
         fun() -> handle_function(Func, Args, Ctx) end
     ).
 
-handle_function('ProcessSignal', [
+handle_function('ProcessSignal', {
     #mg_stateproc_SignalArgs{
         signal = {Type, Signal},
         machine = #mg_stateproc_Machine{id = ID, history = History0} = Machine
     }
-], Ctx) ->
+}, Ctx) ->
     ok = scoper:add_meta(#{id => ID, signal => Type}),
     History = unmarshal_history(History0),
     Result = case Signal of
