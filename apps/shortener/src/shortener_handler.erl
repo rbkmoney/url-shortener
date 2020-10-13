@@ -3,12 +3,14 @@
 %% Swagger handler
 
 -behaviour(swag_server_logic_handler).
+
 -export([authorize_api_key/3]).
 -export([handle_request/4]).
 
 %% Cowboy http handler
 
 -behaviour(cowboy_handler).
+
 -export([init/2]).
 -export([terminate/3]).
 
@@ -18,20 +20,17 @@
 -define(REALM, <<"external">>).
 
 -type operation_id() :: swag_server:operation_id().
--type request_ctx()  :: swag_server:request_context().
+-type request_ctx() :: swag_server:request_context().
 -type request_data() :: #{atom() | binary() => term()}.
--type subject_id()   :: woody_user_identity:id().
+-type subject_id() :: woody_user_identity:id().
 
 -spec authorize_api_key(operation_id(), swag_server:api_key(), swag_server:handler_opts(_)) ->
     Result :: false | {true, shortener_auth:context()}.
-
 authorize_api_key(OperationID, ApiKey, _Opts) ->
     ok = scoper:add_scope('swag.server', #{operation => OperationID}),
     shortener_auth:authorize_api_key(OperationID, ApiKey).
 
--spec handle_request(operation_id(), request_data(), request_ctx(), any()) ->
-    {ok | error, swag_server:response()}.
-
+-spec handle_request(operation_id(), request_data(), request_ctx(), any()) -> {ok | error, swag_server:response()}.
 handle_request(OperationID, Req, Context, _Opts) ->
     try
         AuthContext = get_auth_context(Context),
@@ -52,7 +51,6 @@ handle_request(OperationID, Req, Context, _Opts) ->
     end.
 
 -spec prefetch_slug(request_data(), woody_context:ctx()) -> shortener_slug:slug() | no_slug.
-
 prefetch_slug(#{'shortenedUrlID' := ID}, WoodyCtx) ->
     case shortener_slug:get(ID, WoodyCtx) of
         {ok, Slug} ->
@@ -70,9 +68,9 @@ create_woody_ctx(#{'X-Request-ID' := RequestID}, AuthContext) ->
 
 collect_user_identity(AuthContext) ->
     genlib_map:compact(#{
-        id       => get_subject_id(AuthContext),
-        realm    => ?REALM,
-        email    => get_claim(<<"email">>, AuthContext, undefined),
+        id => get_subject_id(AuthContext),
+        realm => ?REALM,
+        email => get_claim(<<"email">>, AuthContext, undefined),
         username => get_claim(<<"name">>, AuthContext, undefined)
     }).
 
@@ -96,13 +94,14 @@ handle_woody_error(_Source, result_unknown, _Details) ->
 
 -spec process_request(operation_id(), request_data(), shortener_slug:slug(), subject_id(), woody_context:ctx()) ->
     {ok | error, swag_server:response()}.
-
 process_request(
     'ShortenUrl',
-    #{'ShortenedUrlParams' := #{
-        <<"sourceUrl">> := SourceUrl,
-        <<"expiresAt">> := ExpiresAt
-    }},
+    #{
+        'ShortenedUrlParams' := #{
+            <<"sourceUrl">> := SourceUrl,
+            <<"expiresAt">> := ExpiresAt
+        }
+    },
     no_slug,
     SubjectID,
     WoodyCtx
@@ -112,12 +111,12 @@ process_request(
             Slug = shortener_slug:create(SourceUrl, parse_timestamp(ExpiresAt), SubjectID, WoodyCtx),
             {ok, {201, #{}, construct_shortened_url(Slug)}};
         false ->
-            {ok, {400, #{}, #{
-                <<"code">> => <<"forbidden_source_url">>,
-                <<"message">> => <<"Source URL is forbidden">>
-            }}}
+            {ok,
+                {400, #{}, #{
+                    <<"code">> => <<"forbidden_source_url">>,
+                    <<"message">> => <<"Source URL is forbidden">>
+                }}}
     end;
-
 process_request(
     'GetShortenedUrl',
     _Req,
@@ -134,7 +133,6 @@ process_request(
     _WoodyCtx
 ) ->
     {ok, {200, #{}, construct_shortened_url(Slug)}};
-
 process_request(
     'DeleteShortenedUrl',
     #{'shortenedUrlID' := ID},
@@ -151,7 +149,7 @@ process_request(
 
 validate_source_url(SourceUrl) ->
     lists:any(
-        fun (Pattern) -> is_source_url_valid(SourceUrl, Pattern) end,
+        fun(Pattern) -> is_source_url_valid(SourceUrl, Pattern) end,
         get_source_url_whitelist()
     ).
 
@@ -199,32 +197,29 @@ get_source_url_whitelist() ->
 
 %%
 
--type state()            :: undefined.
--type request()          :: cowboy_req:req().
+-type state() :: undefined.
+-type request() :: cowboy_req:req().
 -type terminate_reason() :: {normal, shutdown} | {error, atom()}.
 
--spec init(request(), _) ->
-    {ok, request(), state()}.
-
+-spec init(request(), _) -> {ok, request(), state()}.
 init(Req, Opts) ->
     ID = cowboy_req:binding('shortenedUrlID', Req),
-    Req1 = case shortener_slug:get(ID, woody_context:new()) of
-        {ok, #{source := Source, expires_at := ExpiresAt}} ->
-            Seconds = genlib_rfc3339:parse(ExpiresAt, second),
-            {Date, Time} = calendar:system_time_to_universal_time(Seconds, second),
-            Headers = #{
-                <<"location">>      => Source,
-                <<"expires">>       => cowboy_clock:rfc1123({Date, Time}),
-                <<"cache-control">> => <<"must-revalidate">>
-            },
-            cowboy_req:reply(301, Headers, Req);
-        {error, notfound} ->
-            cowboy_req:reply(404, Req)
-    end,
+    Req1 =
+        case shortener_slug:get(ID, woody_context:new()) of
+            {ok, #{source := Source, expires_at := ExpiresAt}} ->
+                Seconds = genlib_rfc3339:parse(ExpiresAt, second),
+                {Date, Time} = calendar:system_time_to_universal_time(Seconds, second),
+                Headers = #{
+                    <<"location">> => Source,
+                    <<"expires">> => cowboy_clock:rfc1123({Date, Time}),
+                    <<"cache-control">> => <<"must-revalidate">>
+                },
+                cowboy_req:reply(301, Headers, Req);
+            {error, notfound} ->
+                cowboy_req:reply(404, Req)
+        end,
     {ok, Req1, Opts}.
 
--spec terminate(terminate_reason(), request(), state()) ->
-    ok.
-
+-spec terminate(terminate_reason(), request(), state()) -> ok.
 terminate(_Reason, _Req, _St) ->
     ok.
