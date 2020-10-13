@@ -2,13 +2,13 @@
 
 %%
 
--opaque t()           :: [{{priority(), scope()}, [permission()]}].
+-opaque t() :: [{{priority(), scope()}, [permission()]}].
 
--type priority()      :: integer().
--type scope()         :: [resource() | {resource(), resource_id()}, ...].
--type resource()      :: atom().
--type resource_id()   :: binary().
--type permission()    :: read | write.
+-type priority() :: integer().
+-type scope() :: [resource() | {resource(), resource_id()}, ...].
+-type resource() :: atom().
+-type resource_id() :: binary().
+-type permission() :: read | write.
 
 -export_type([t/0]).
 -export_type([scope/0]).
@@ -27,27 +27,19 @@
 
 %%
 
--spec new() ->
-    t().
-
+-spec new() -> t().
 new() ->
     [].
 
--spec to_list(t()) ->
-    [{scope(), permission()}].
-
+-spec to_list(t()) -> [{scope(), permission()}].
 to_list(ACL) ->
     [{S, P} || {{_, S}, P} <- ACL].
 
--spec from_list([{scope(), permission()}]) ->
-    t().
-
+-spec from_list([{scope(), permission()}]) -> t().
 from_list(L) ->
-    lists:foldl(fun ({S, P}, ACL) -> insert_scope(S, P, ACL) end, new(), L).
+    lists:foldl(fun({S, P}, ACL) -> insert_scope(S, P, ACL) end, new(), L).
 
--spec insert_scope(scope(), permission(), t()) ->
-    t().
-
+-spec insert_scope(scope(), permission(), t()) -> t().
 insert_scope(Scope, Permission, ACL) ->
     Priority = compute_priority(Scope, Permission),
     insert({{Priority, Scope}, [Permission]}, ACL).
@@ -62,9 +54,7 @@ insert({PS, _} = V, [{PS0, _} | _] = Vs) when PS > PS0 ->
 insert(V, []) ->
     [V].
 
--spec remove_scope(scope(), permission(), t()) ->
-    t().
-
+-spec remove_scope(scope(), permission(), t()) -> t().
 remove_scope(Scope, Permission, ACL) ->
     Priority = compute_priority(Scope, Permission),
     remove({{Priority, Scope}, [Permission]}, ACL).
@@ -107,9 +97,7 @@ compute_permission_priority(V) ->
 
 %%
 
--spec match(scope(), t()) ->
-    [permission()].
-
+-spec match(scope(), t()) -> [permission()].
 match(Scope, ACL) when length(Scope) > 0 ->
     match_rules(Scope, ACL);
 match(Scope, _) ->
@@ -144,9 +132,7 @@ match_scope(_, _) ->
 
 %%
 
--spec decode([binary()]) ->
-    t().
-
+-spec decode([binary()]) -> t().
 decode(V) ->
     lists:foldl(fun decode_entry/2, new(), V).
 
@@ -180,7 +166,9 @@ decode_scope_frag_resource(V, ID, H) ->
     {{R, ID}, delve(R, H)}.
 
 decode_resource(V) ->
-    try binary_to_existing_atom(V, utf8) catch
+    try
+        binary_to_existing_atom(V, utf8)
+    catch
         error:badarg ->
             error({badarg, {resource, V}})
     end.
@@ -194,16 +182,19 @@ decode_permission(V) ->
 
 %%
 
--spec encode(t()) ->
-    [binary()].
-
+-spec encode(t()) -> [binary()].
 encode(ACL) ->
     lists:flatmap(fun encode_entry/1, ACL).
 
 encode_entry({{_Priority, Scope}, Permissions}) ->
     S = encode_scope(Scope),
-    [begin P = encode_permission(Permission), <<S/binary, ":", P/binary>> end
-        || Permission <- Permissions].
+    [
+        begin
+            P = encode_permission(Permission),
+            <<S/binary, ":", P/binary>>
+        end
+        || Permission <- Permissions
+    ].
 
 encode_scope(Scope) ->
     Hierarchy = get_resource_hierarchy(),

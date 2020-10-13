@@ -1,4 +1,5 @@
 -module(shortener_slug).
+
 -include_lib("mg_proto/include/mg_proto_state_processing_thrift.hrl").
 
 %% API
@@ -18,28 +19,27 @@
 
 %%
 
--type timestamp()  :: binary(). % RFC 3339
+% RFC 3339
+-type timestamp() :: binary().
 
--type id()         :: binary().
--type source()     :: binary().
--type owner()      :: binary().
+-type id() :: binary().
+-type source() :: binary().
+-type owner() :: binary().
 -type expiration() :: timestamp().
 
--type slug()       :: #{
-    id             => id(),
-    source         => source(),
-    owner          => owner() | undefined,
-    expires_at     => expiration()
+-type slug() :: #{
+    id => id(),
+    source => source(),
+    owner => owner() | undefined,
+    expires_at => expiration()
 }.
+
 -export_type([slug/0]).
 -export_type([owner/0]).
 
--type ctx()        :: woody_context:ctx().
+-type ctx() :: woody_context:ctx().
 
-
--spec create(source(), expiration(), owner(), ctx()) ->
-    slug().
-
+-spec create(source(), expiration(), owner(), ctx()) -> slug().
 create(Source, ExpiresAt, Owner, Ctx) ->
     create(Source, ExpiresAt, Owner, 0, Ctx).
 
@@ -53,9 +53,7 @@ create(Source, ExpiresAt, Owner, Attempt, Ctx) ->
             create(Source, ExpiresAt, Owner, Attempt + 1, Ctx)
     end.
 
--spec get(id(), ctx()) ->
-    {ok, slug()} | {error, notfound}.
-
+-spec get(id(), ctx()) -> {ok, slug()} | {error, notfound}.
 get(ID, Ctx) ->
     case get_machine_history(ID, Ctx) of
         {ok, History} ->
@@ -65,9 +63,7 @@ get(ID, Ctx) ->
             {error, notfound}
     end.
 
--spec remove(id(), ctx()) ->
-    ok | {error, notfound}.
-
+-spec remove(id(), ctx()) -> ok | {error, notfound}.
 remove(ID, Ctx) ->
     case remove_machine(ID, Ctx) of
         {ok, _} ->
@@ -88,10 +84,12 @@ format_id(ID) ->
     genlib_format:format_int_base(ID, 62).
 
 get_hash_algorithm() ->
-    {ok, V} = application:get_env(shortener, hash_algorithm), V.
+    {ok, V} = application:get_env(shortener, hash_algorithm),
+    V.
 
 get_space_size() ->
-    {ok, V} = application:get_env(shortener, space_size), V.
+    {ok, V} = application:get_env(shortener, space_size),
+    V.
 
 %%
 
@@ -139,6 +137,7 @@ call_service(Service, Method, Args, ClientOpts, Context) ->
     DeadlineContext = set_deadline(Deadline, Context),
     Retry = get_service_retry(Service, Method),
     call_service(Service, Method, Args, ClientOpts, DeadlineContext, Retry).
+
 call_service(Service, Method, Args, ClientOpts, Context, Retry) ->
     Request = {get_service_modname(Service), Method, Args},
     try
@@ -184,7 +183,7 @@ apply_retry_step({wait, Timeout, Retry}, Deadline0, Error) ->
         false ->
             ok = timer:sleep(Timeout),
             Retry
-end.
+    end.
 
 get_service_client_config(ServiceName) ->
     ServiceClients = genlib_app:env(shortener, service_clients, #{}),
@@ -197,34 +196,37 @@ get_service_modname(automaton) ->
 
 %%
 
--type signal()        :: mg_proto_state_processing_thrift:'SignalArgs'().
+-type signal() :: mg_proto_state_processing_thrift:'SignalArgs'().
 -type signal_result() :: mg_proto_state_processing_thrift:'SignalResult'().
 
--spec handle_function
-    ('ProcessSignal', {signal()}, ctx(), woody:options()) ->
-        {ok, signal_result()} | no_return().
-
+-spec handle_function('ProcessSignal', {signal()}, ctx(), woody:options()) -> {ok, signal_result()} | no_return().
 handle_function(Func, Args, Ctx, _Opts) ->
-    scoper:scope(machine,
+    scoper:scope(
+        machine,
         fun() -> handle_function(Func, Args, Ctx) end
     ).
 
-handle_function('ProcessSignal', {
-    #mg_stateproc_SignalArgs{
-        signal = {Type, Signal},
-        machine = #mg_stateproc_Machine{id = ID, history = History0} = Machine
-    }
-}, Ctx) ->
+handle_function(
+    'ProcessSignal',
+    {
+        #mg_stateproc_SignalArgs{
+            signal = {Type, Signal},
+            machine = #mg_stateproc_Machine{id = ID, history = History0} = Machine
+        }
+    },
+    Ctx
+) ->
     ok = scoper:add_meta(#{id => ID, signal => Type}),
     History = unmarshal_history(History0),
-    Result = case Signal of
-        #mg_stateproc_InitSignal{arg = Args} ->
-            handle_init(unmarshal(term, Args), Ctx);
-        #mg_stateproc_TimeoutSignal{} ->
-            handle_timeout(collapse_history(History), Ctx);
-        #mg_stateproc_RepairSignal{arg = Args} ->
-            handle_repair(unmarshal(term, Args), collapse_history(History), Ctx)
-    end,
+    Result =
+        case Signal of
+            #mg_stateproc_InitSignal{arg = Args} ->
+                handle_init(unmarshal(term, Args), Ctx);
+            #mg_stateproc_TimeoutSignal{} ->
+                handle_timeout(collapse_history(History), Ctx);
+            #mg_stateproc_RepairSignal{arg = Args} ->
+                handle_repair(unmarshal(term, Args), collapse_history(History), Ctx)
+        end,
     {ok, handle_signal_result(Result, Machine)}.
 
 handle_signal_result(Result, Machine) ->
@@ -235,7 +237,7 @@ handle_signal_result(Result, Machine) ->
 
 construct_machine_change(Events, #mg_stateproc_Machine{aux_state = AuxState}) ->
     #mg_stateproc_MachineStateChange{
-        events    = [construct_content(marshal(event, E)) || E <- Events],
+        events = [construct_content(marshal(event, E)) || E <- Events],
         aux_state = construct_aux_state(AuxState)
     }.
 
@@ -286,7 +288,6 @@ apply_event({created, Slug}, undefined) ->
 
 marshal(event, {created, #{source := Source, expires_at := ExpiresAt, owner := Owner}}) ->
     {arr, [{i, 2}, marshal(string, Source), marshal(timestamp, ExpiresAt), marshal(string, Owner)]};
-
 marshal(timestamp, V) ->
     marshal(string, V);
 marshal(string, V) ->
@@ -306,7 +307,6 @@ unmarshal(event, {arr, [{i, 1}, Source, ExpiresAt]}) ->
         expires_at => unmarshal(timestamp, ExpiresAt),
         owner => undefined
     }};
-
 unmarshal(timestamp, V) ->
     unmarshal(string, V);
 unmarshal(string, {str, V}) ->

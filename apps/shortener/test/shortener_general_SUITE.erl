@@ -46,7 +46,6 @@ all() ->
     ].
 
 -spec groups() -> [{atom(), list(), [test_case_name()]}].
-
 groups() ->
     [
         {general, [], [
@@ -91,20 +90,21 @@ init_per_suite(C) ->
     ] ++ C.
 
 -spec init_per_group(atom(), config()) -> config().
-
 init_per_group(_Group, C) ->
     ShortenerApp =
-        genlib_app:start_application_with(shortener, get_app_config(
-            ?config(port, C),
-            ?config(netloc, C),
-            get_keysource("keys/local/private.pem", C)
-        )),
+        genlib_app:start_application_with(
+            shortener,
+            get_app_config(
+                ?config(port, C),
+                ?config(netloc, C),
+                get_keysource("keys/local/private.pem", C)
+            )
+        ),
     [
         {shortener_app, ShortenerApp}
     ] ++ C.
 
 -spec end_per_group(atom(), config()) -> _.
-
 end_per_group(_Group, C) ->
     genlib_app:stop_unload_applications(?config(shortener_app, C)).
 
@@ -115,13 +115,11 @@ get_keysource(Key, C) ->
 end_per_suite(C) ->
     genlib_app:stop_unload_applications(?config(suite_apps, C)).
 
--spec init_per_testcase(test_case_name(), config()) ->
-    config().
+-spec init_per_testcase(test_case_name(), config()) -> config().
 init_per_testcase(_Name, C) ->
     C.
 
--spec end_per_testcase(test_case_name(), config()) ->
-    config().
+-spec end_per_testcase(test_case_name(), config()) -> config().
 end_per_testcase(_Name, _C) ->
     ok.
 
@@ -217,13 +215,12 @@ always_unique_url(C) ->
     N = 42,
     Params = construct_params(<<"https://oops.io/">>, 3600),
     {IDs, ShortUrls} = lists:unzip([
-        {ID, ShortUrl} ||
-            _ <- lists:seq(1, N),
-            {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} <- [shorten_url(Params, C1)]
+        {ID, ShortUrl}
+        || _ <- lists:seq(1, N),
+           {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} <- [shorten_url(Params, C1)]
     ]),
     N = length(lists:usort(IDs)),
     N = length(lists:usort(ShortUrls)).
-
 
 %% cors
 -spec unsupported_cors_method(config()) -> _.
@@ -251,24 +248,32 @@ supported_cors_method(C) ->
     {_, Returned} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
     Allowed = binary:split(Returned, <<",">>, [global]).
 
-
 supported_cors_header(C) ->
     SourceUrl = <<"https://oops.io/">>,
     Params = construct_params(SourceUrl),
     C1 = set_api_auth_token(supported_cors_header, [read, write], C),
     {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
-    ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"GET">>}, {<<"access-control-request-headers">>, <<"content-type,authorization">>}],
+    ReqHeaders = [
+        {<<"origin">>, <<"localhost">>},
+        {<<"access-control-request-method">>, <<"GET">>},
+        {<<"access-control-request-headers">>, <<"content-type,authorization">>}
+    ],
     {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
     {Allowed, _} = shortener_cors_policy:allowed_headers(undefined, undefined),
     {_, Returned} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
-    [_ | Allowed] = binary:split(Returned, <<",">>, [global]). % truncate origin
+    % truncate origin
+    [_ | Allowed] = binary:split(Returned, <<",">>, [global]).
 
 unsupported_cors_header(C) ->
     SourceUrl = <<"https://oops.io/">>,
     Params = construct_params(SourceUrl),
     C1 = set_api_auth_token(unsupported_cors_header, [read, write], C),
     {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
-    ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"GET">>}, {<<"access-control-request-headers">>, <<"content-type,42">>}],
+    ReqHeaders = [
+        {<<"origin">>, <<"localhost">>},
+        {<<"access-control-request-method">>, <<"GET">>},
+        {<<"access-control-request-headers">>, <<"content-type,42">>}
+    ],
     {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
     false = lists:member(<<"access-control-allow-headers">>, Headers),
     false = lists:member(<<"access-control-allow-credentials">>, Headers),
@@ -286,14 +291,16 @@ construct_params(SourceUrl, Lifetime) ->
 
 %%
 -spec woody_timeout_test(config()) -> _.
-
 woody_timeout_test(C) ->
-    Apps = genlib_app:start_application_with(shortener, get_app_config(
-        ?config(port, C),
-        ?config(netloc, C),
-        get_keysource("keys/local/private.pem", C),
-        <<"http://invalid_url:8022/v1/automaton">>
-    )),
+    Apps = genlib_app:start_application_with(
+        shortener,
+        get_app_config(
+            ?config(port, C),
+            ?config(netloc, C),
+            get_keysource("keys/local/private.pem", C),
+            <<"http://invalid_url:8022/v1/automaton">>
+        )
+    ),
     C2 = set_api_auth_token(woody_timeout_test, [read, write], C),
     SourceUrl = <<"https://example.com/">>,
     Params = construct_params(SourceUrl),
@@ -306,13 +313,15 @@ woody_timeout_test(C) ->
 
 %%
 -spec health_check_passing(config()) -> _.
-
 health_check_passing(C) ->
-    Apps = genlib_app:start_application_with(shortener, get_app_config(
-        ?config(port, C),
-        ?config(netloc, C),
-        get_keysource("keys/local/private.pem", C)
-    )),
+    Apps = genlib_app:start_application_with(
+        shortener,
+        get_app_config(
+            ?config(port, C),
+            ?config(netloc, C),
+            get_keysource("keys/local/private.pem", C)
+        )
+    ),
     Path = ?config(api_endpoint, C) ++ "/health",
     {ok, 200, _, Payload} = hackney:request(get, Path, [], <<>>, [with_body]),
     #{<<"service">> := <<"shortener">>} = jsx:decode(Payload, [return_maps]),
@@ -352,15 +361,22 @@ get_shortened_url(ID, C) ->
     ).
 
 append_common_params(Params, C) ->
-    append_media_type(append_auth(append_request_id(
-        maps:merge(#{binding => #{}, qs_val => #{}, header => #{}, body => #{}}, Params)
-    ), C)).
+    append_media_type(
+        append_auth(
+            append_request_id(
+                maps:merge(#{binding => #{}, qs_val => #{}, header => #{}, body => #{}}, Params)
+            ),
+            C
+        )
+    ).
 
 append_media_type(Params = #{header := Headers}) ->
-    Params#{header => Headers#{
-        <<"Accept">>       => <<"application/json">>,
-        <<"Content-Type">> => <<"application/json; charset=utf-8">>
-    }}.
+    Params#{
+        header => Headers#{
+            <<"Accept">> => <<"application/json">>,
+            <<"Content-Type">> => <<"application/json; charset=utf-8">>
+        }
+    }.
 
 append_auth(Params = #{header := Headers}, C) ->
     case lists:keyfind(api_auth_token, 1, C) of
@@ -383,15 +399,15 @@ get_app_config(Port, Netloc, PemFile) ->
 
 get_app_config(Port, Netloc, PemFile, AutomatonUrl) ->
     [
-        {space_size             , 8},
-        {hash_algorithm         , sha256},
+        {space_size, 8},
+        {hash_algorithm, sha256},
         {api, #{
-            ip                 => "::",
-            port               => Port,
-            authorizer         => #{
-                signee         => local,
+            ip => "::",
+            port => Port,
+            authorizer => #{
+                signee => local,
                 keyset => #{
-                    local      => {pem_file, PemFile}
+                    local => {pem_file, PemFile}
                 }
             },
             source_url_whitelist => [
@@ -400,14 +416,14 @@ get_app_config(Port, Netloc, PemFile, AutomatonUrl) ->
                 "http://localhost/*"
             ],
             short_url_template => #{
-                scheme         => http,
-                netloc         => Netloc,
-                path           => "/r/e/d/i/r/"
+                scheme => http,
+                netloc => Netloc,
+                path => "/r/e/d/i/r/"
             }
         }},
         {processor, #{
-            ip                 => "::",
-            port               => 8022
+            ip => "::",
+            port => 8022
         }},
         {health_check, #{
             service => {erl_health, service, [<<"shortener">>]}
@@ -421,10 +437,10 @@ get_app_config(Port, Netloc, PemFile, AutomatonUrl) ->
                     % default value is 'finish'
                     % for more info look genlib_retry :: strategy()
                     % https://github.com/rbkmoney/genlib/blob/master/src/genlib_retry.erl#L19
-                    'Start'   => {linear, 3, 1000},
-                    'GetMachine'   => {linear, 3, 1000},
-                    'Remove'   => {linear, 3, 1000},
-                    '_'     => finish
+                    'Start' => {linear, 3, 1000},
+                    'GetMachine' => {linear, 3, 1000},
+                    'Remove' => {linear, 3, 1000},
+                    '_' => finish
                 }
             }
         }}
