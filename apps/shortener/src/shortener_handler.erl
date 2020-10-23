@@ -6,6 +6,7 @@
 
 -export([authorize_api_key/3]).
 -export([handle_request/4]).
+-export([map_error/2]).
 
 %% Cowboy http handler
 
@@ -23,6 +24,9 @@
 -type request_ctx() :: swag_server:request_context().
 -type request_data() :: #{atom() | binary() => term()}.
 -type subject_id() :: woody_user_identity:id().
+-type validation_error() :: swag_server_validation:error().
+-type error_type() :: validation_error.
+-type error_message() :: swag_server:error_reason().
 
 -spec authorize_api_key(operation_id(), swag_server:api_key(), swag_server:handler_opts(_)) ->
     Result :: false | {true, shortener_auth:context()}.
@@ -49,6 +53,24 @@ handle_request(OperationID, Req, Context, _Opts) ->
     after
         ok = scoper:remove_scope()
     end.
+
+-spec map_error(error_type(), validation_error()) -> error_message().
+map_error(validation_error, Error) ->
+    Type = genlib:to_binary(maps:get(type, Error)),
+    Name = genlib:to_binary(maps:get(param_name, Error)),
+    Message =
+        case maps:get(description, Error, undefined) of
+            undefined ->
+                <<"Request parameter: ", Name/binary, ", error type: ", Type/binary>>;
+            Description ->
+                DescriptionBin = genlib:to_binary(Description),
+                <<"Request parameter: ", Name/binary, ", error type: ", Type/binary, ", description: ",
+                    DescriptionBin/binary>>
+        end,
+    jsx:encode(#{
+        <<"code">> => <<"invalidRequest">>,
+        <<"message">> => Message
+    }).
 
 -spec prefetch_slug(request_data(), woody_context:ctx()) -> shortener_slug:slug() | no_slug.
 prefetch_slug(#{'shortenedUrlID' := ID}, WoodyCtx) ->

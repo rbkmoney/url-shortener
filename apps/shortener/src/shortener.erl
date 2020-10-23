@@ -35,15 +35,21 @@ start_link() ->
 -spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
     HealthRoutes = get_health_routes(genlib_app:env(?MODULE, health_check, #{})),
+    PrometeusRout = get_prometheus_route(),
+    AdditionalRoutes = [PrometeusRout | HealthRoutes],
     {ok, {
         {one_for_all, 0, 1},
         % TODO
-        get_processor_childspecs(genlib_app:env(?MODULE, processor), HealthRoutes) ++
+        get_processor_childspecs(genlib_app:env(?MODULE, processor), AdditionalRoutes) ++
             get_api_childspecs(genlib_app:env(?MODULE, api), HealthRoutes)
     }}.
 
 get_health_routes(Check) ->
     [erl_health_handle:get_route(enable_health_logging(Check))].
+
+-spec get_prometheus_route() -> {iodata(), module(), _Opts :: any()}.
+get_prometheus_route() ->
+    {"/metrics/[:registry]", prometheus_cowboy2_handler, []}.
 
 enable_health_logging(Check = #{}) ->
     maps:map(
@@ -53,7 +59,7 @@ enable_health_logging(Check = #{}) ->
         Check
     ).
 
-get_processor_childspecs(Opts, HealthRoutes) ->
+get_processor_childspecs(Opts, AdditionalRoutes) ->
     {ok, IP} = inet:parse_address(maps:get(ip, Opts, "::")),
     [
         woody_server:child_spec(
@@ -70,7 +76,7 @@ get_processor_childspecs(Opts, HealthRoutes) ->
                         shortener_slug
                     }}
                 ],
-                additional_routes => HealthRoutes
+                additional_routes => AdditionalRoutes
             }
         )
     ].

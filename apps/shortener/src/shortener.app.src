@@ -16,7 +16,9 @@
         mg_proto,
         woody,
         woody_user_identity,
-        erl_health
+        erl_health,
+        prometheus,
+        prometheus_cowboy
     ]},
     {env, []},
     {modules, []},
