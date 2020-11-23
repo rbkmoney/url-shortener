@@ -1,7 +1,7 @@
 -module(shortener_auth).
 
 -export([authorize_api_key/2]).
--export([authorize_operation/3]).
+-export([authorize_operation/4]).
 
 -type context() :: shortener_authorizer_jwt:t().
 -type claims() :: shortener_authorizer_jwt:claims().
@@ -42,17 +42,38 @@ parse_api_key(ApiKey) ->
 authorize_api_key(_OperationID, bearer, Token) ->
     shortener_authorizer_jwt:verify(Token).
 
--spec authorize_operation(OperationID, Slug, Context) -> ok | {error, forbidden} when
+-spec authorize_operation(OperationID, Slug, ReqContext, WoodyCtx) -> ok | {error, forbidden} when
     OperationID :: swag_server:operation_id(),
     Slug :: shortener_slug:slug() | no_slug,
-    Context :: context().
-authorize_operation(OperationID, Slug, {{SubjectID, ACL}, _Claims}) ->
+    ReqContext :: swag_server:request_context(),
+    WoodyCtx :: woody_context:ctx().
+authorize_operation(OperationID, Slug, ReqContext, WoodyCtx) ->
+    {{SubjectID, _ACL, ExpiresAt}, Claims} = get_auth_context(ReqContext),
+    IpAddress = get_peer(ReqContext),
     Owner = get_slug_owner(Slug),
-    Permissions = shortener_acl:match(['shortened-urls'], ACL),
-    case is_operation_permitted(OperationID, SubjectID, Owner, Permissions) of
-        true ->
+    ID = get_slug_id(Slug),
+    Email = maps:get(<<"email">>, Claims, undefined),
+    JudgeContext = #{
+        fragments => #{
+            <<"env">> => bouncer_context_helpers:make_default_env_context_fragment(),
+            <<"auth">> => bouncer_context_helpers:make_auth_context_fragment(#{
+                method => <<"SessionToken">>,
+                expiration => genlib_rfc3339:format(ExpiresAt, second)
+            }),
+            <<"user">> => bouncer_context_helpers:make_user_context_fragment(#{id => SubjectID, email => Email}),
+            <<"requester">> => bouncer_context_helpers:make_requester_context_fragment(#{ip => IpAddress}),
+            <<"shortener">> => shortener_bouncer_client:make_shortener_context_fragment(
+                genlib:to_binary(OperationID),
+                ID,
+                Owner
+            )
+        }
+    },
+    {ok, RulesetID} = application:get_env(shortener, bouncer_ruleset_id),
+    case bouncer_client:judge(RulesetID, JudgeContext, WoodyCtx) of
+        allowed ->
             ok;
-        false ->
+        forbidden ->
             {error, forbidden}
     end.
 
@@ -62,13 +83,21 @@ get_slug_owner(no_slug) ->
 get_slug_owner(#{owner := Owner}) ->
     Owner.
 
-is_operation_permitted('ShortenUrl', _SubjectID, undefined, Ps) ->
-    lists:member(write, Ps);
-is_operation_permitted('DeleteShortenedUrl', _SubjectID, undefined, Ps) ->
-    lists:member(write, Ps);
-is_operation_permitted('DeleteShortenedUrl', SubjectID, Owner, Ps) ->
-    (SubjectID == Owner) and lists:member(write, Ps);
-is_operation_permitted('GetShortenedUrl', _SubjectID, undefined, Ps) ->
-    lists:member(read, Ps);
-is_operation_permitted('GetShortenedUrl', SubjectID, Owner, Ps) ->
-    (SubjectID == Owner) and lists:member(read, Ps).
+-spec get_slug_id(shortener_slug:slug() | no_slug) -> shortener_slug:id() | undefined.
+get_slug_id(no_slug) ->
+    undefined;
+get_slug_id(#{id := ID}) ->
+    ID.
+
+get_auth_context(#{auth_context := AuthContext}) ->
+    AuthContext.
+
+get_peer(#{peer := Peer}) ->
+    case maps:get(ip_address, Peer, undefined) of
+        undefined ->
+            undefined;
+        IP ->
+            inet:ntoa(IP)
+    end;
+get_peer(_) ->
+    undefined.

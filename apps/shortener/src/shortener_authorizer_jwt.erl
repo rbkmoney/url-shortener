@@ -24,7 +24,8 @@
 -type key() :: #jose_jwk{}.
 -type token() :: binary().
 -type claims() :: #{binary() => term()}.
--type subject() :: {subject_id(), shortener_acl:t()}.
+%% Added expiration to subject tuple as part of token service claims
+-type subject() :: {subject_id(), shortener_acl:t(), pos_integer() | undefined}.
 -type subject_id() :: binary().
 -type t() :: {subject(), claims()}.
 -type expiration() ::
@@ -262,8 +263,9 @@ verify(KID, Alg, ExpandedToken) ->
 verify(JWK, ExpandedToken) ->
     case jose_jwt:verify(JWK, ExpandedToken) of
         {true, #jose_jwt{fields = Claims}, _JWS} ->
-            {#{subject_id := SubjectID}, Claims1} = validate_claims(Claims),
-            get_result(SubjectID, decode_roles(Claims1));
+            {Data = #{subject_id := SubjectID}, Claims1} = validate_claims(Claims),
+            ExpiresAt = maps:get(expires_at, Data, undefined),
+            get_result({SubjectID, ExpiresAt}, decode_roles(Claims1));
         {false, _JWT, _JWS} ->
             {error, invalid_signature}
     end.
@@ -277,9 +279,9 @@ validate_claims(Claims, [{Name, Claim, Validator} | Rest], Acc) ->
 validate_claims(Claims, [], Acc) ->
     {Acc, Claims}.
 
-get_result(SubjectID, {Roles, Claims}) ->
+get_result({SubjectID, ExpiresAt}, {Roles, Claims}) ->
     try
-        Subject = {SubjectID, shortener_acl:decode(Roles)},
+        Subject = {SubjectID, shortener_acl:decode(Roles), ExpiresAt},
         {ok, {Subject, Claims}}
     catch
         error:{badarg, _} = Reason ->
