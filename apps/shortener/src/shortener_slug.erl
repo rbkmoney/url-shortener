@@ -35,6 +35,7 @@
 }.
 
 -export_type([slug/0]).
+-export_type([id/0]).
 -export_type([owner/0]).
 
 -type ctx() :: woody_context:ctx().

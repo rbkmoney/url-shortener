@@ -1,5 +1,8 @@
 -module(shortener_general_SUITE).
 
+-include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_context_v1_thrift.hrl").
+
 -export([all/0]).
 -export([groups/0]).
 -export([init_per_suite/1]).
@@ -9,13 +12,8 @@
 -export([init_per_testcase/2]).
 -export([end_per_testcase/2]).
 
--export([failed_authorization/1]).
--export([insufficient_permissions/1]).
--export([readonly_permissions/1]).
 -export([successful_redirect/1]).
 -export([successful_delete/1]).
--export([other_subject_delete/1]).
--export([other_subject_read/1]).
 -export([fordidden_source_url/1]).
 -export([url_expired/1]).
 -export([always_unique_url/1]).
@@ -49,14 +47,8 @@ all() ->
 groups() ->
     [
         {general, [], [
-            failed_authorization,
-            insufficient_permissions,
-            readonly_permissions,
-
             successful_redirect,
             successful_delete,
-            other_subject_delete,
-            other_subject_read,
             fordidden_source_url,
             url_expired,
             always_unique_url
@@ -80,7 +72,8 @@ init_per_suite(C) ->
     Apps =
         genlib_app:start_application_with(scoper, [
             {storage, scoper_storage_logger}
-        ]),
+        ]) ++
+            genlib_app:start_application_with(bouncer_client, shortener_ct_helper:get_bouncer_client_app_config()),
     [
         {suite_apps, Apps},
         {api_endpoint, "http://" ++ Netloc},
@@ -94,7 +87,7 @@ init_per_group(_Group, C) ->
     ShortenerApp =
         genlib_app:start_application_with(
             shortener,
-            get_app_config(
+            shortener_ct_helper:get_app_config(
                 ?config(port, C),
                 ?config(netloc, C),
                 get_keysource("keys/local/private.pem", C)
@@ -117,50 +110,29 @@ end_per_suite(C) ->
 
 -spec init_per_testcase(test_case_name(), config()) -> config().
 init_per_testcase(_Name, C) ->
-    C.
+    shortener_ct_helper:with_test_sup(C).
 
 -spec end_per_testcase(test_case_name(), config()) -> config().
-end_per_testcase(_Name, _C) ->
+end_per_testcase(_Name, C) ->
+    shortener_ct_helper:stop_test_sup(C),
     ok.
 
 %%
 
--spec failed_authorization(config()) -> _.
--spec insufficient_permissions(config()) -> _.
--spec readonly_permissions(config()) -> _.
-
 -spec successful_redirect(config()) -> _.
 -spec successful_delete(config()) -> _.
--spec other_subject_delete(config()) -> _.
--spec other_subject_read(config()) -> _.
 -spec fordidden_source_url(config()) -> _.
 -spec url_expired(config()) -> _.
 -spec always_unique_url(config()) -> _.
 
-failed_authorization(C) ->
-    Params = construct_params(<<"https://oops.io/">>),
-    C1 = clean_api_auth_token(C),
-    {ok, 401, _, _} = shorten_url(Params, C1),
-    {ok, 401, _, _} = delete_shortened_url(<<"42">>, C1),
-    {ok, 401, _, _} = get_shortened_url(<<"42">>, C1).
-
-insufficient_permissions(C) ->
-    C1 = set_api_auth_token(insufficient_permissions, [], C),
-    Params = construct_params(<<"https://oops.io/">>),
-    {ok, 403, _, _} = shorten_url(Params, C1),
-    {ok, 403, _, _} = delete_shortened_url(<<"42">>, C1),
-    {ok, 403, _, _} = get_shortened_url(<<"42">>, C1).
-
-readonly_permissions(C) ->
-    C1 = set_api_auth_token(readonly_permissions, [read, write], C),
-    Params = construct_params(<<"https://oops.io/">>),
-    {ok, 201, _, #{<<"id">> := ID}} = shorten_url(Params, C1),
-    C2 = set_api_auth_token(readonly_permissions, [read], C1),
-    {ok, 200, _, #{<<"id">> := ID}} = get_shortened_url(ID, C2),
-    {ok, 403, _, _} = delete_shortened_url(ID, C2).
-
 successful_redirect(C) ->
-    C1 = set_api_auth_token(successful_redirect, [read, write], C),
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
+    C1 = set_api_auth_token(successful_redirect, C),
     SourceUrl = <<"https://example.com/">>,
     Params = construct_params(SourceUrl),
     {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
@@ -169,32 +141,27 @@ successful_redirect(C) ->
     {<<"location">>, SourceUrl} = lists:keyfind(<<"location">>, 1, Headers).
 
 successful_delete(C) ->
-    C1 = set_api_auth_token(successful_delete, [read, write], C),
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
+    C1 = set_api_auth_token(successful_delete, C),
     Params = construct_params(<<"https://oops.io/">>),
     {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
     {ok, 204, _, _} = delete_shortened_url(ID, C1),
     {ok, 404, _, _} = get_shortened_url(ID, C1),
     {ok, 404, _, _} = hackney:request(get, ShortUrl).
 
-other_subject_delete(C) ->
-    SourceUrl = <<"https://oops.io/">>,
-    Params = construct_params(SourceUrl),
-    C1 = set_api_auth_token(other_subject_delete_first, [read, write], C),
-    {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
-    C2 = set_api_auth_token(other_subject_delete_second, [read, write], C1),
-    {ok, 403, _, _} = delete_shortened_url(ID, C2),
-    {ok, 301, Headers, _} = hackney:request(get, ShortUrl),
-    {<<"location">>, SourceUrl} = lists:keyfind(<<"location">>, 1, Headers).
-
-other_subject_read(C) ->
-    Params = construct_params(<<"https://oops.io/">>),
-    C1 = set_api_auth_token(other_subject_read_first, [read, write], C),
-    {ok, 201, _, #{<<"id">> := ID}} = shorten_url(Params, C1),
-    C2 = set_api_auth_token(other_subject_read_second, [read, write], C1),
-    {ok, 403, _, _} = get_shortened_url(ID, C2).
-
 fordidden_source_url(C) ->
-    C1 = set_api_auth_token(fordidden_source_url, [read, write], C),
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
+    C1 = set_api_auth_token(fordidden_source_url, C),
     {ok, 201, _, #{}} = shorten_url(construct_params(<<"http://localhost/hack?id=42">>), C1),
     {ok, 201, _, #{}} = shorten_url(construct_params(<<"https://localhost/hack?id=42">>), C1),
     {ok, 400, _, #{}} = shorten_url(construct_params(<<"http://example.io/">>), C1),
@@ -202,7 +169,13 @@ fordidden_source_url(C) ->
     {ok, 201, _, #{}} = shorten_url(construct_params(<<"ftp://ftp.hp.com/pub/hpcp/newsletter_july2003">>), C1).
 
 url_expired(C) ->
-    C1 = set_api_auth_token(url_expired, [read, write], C),
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
+    C1 = set_api_auth_token(url_expired, C),
     Params = construct_params(<<"https://oops.io/">>, 1),
     {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
     {ok, 200, _, #{<<"shortenedUrl">> := ShortUrl}} = get_shortened_url(ID, C1),
@@ -211,7 +184,13 @@ url_expired(C) ->
     {ok, 404, _, _} = hackney:request(get, ShortUrl).
 
 always_unique_url(C) ->
-    C1 = set_api_auth_token(always_unique_url, [read, write], C),
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
+    C1 = set_api_auth_token(always_unique_url, C),
     N = 42,
     Params = construct_params(<<"https://oops.io/">>, 3600),
     {IDs, ShortUrls} = lists:unzip([
@@ -229,18 +208,30 @@ always_unique_url(C) ->
 -spec supported_cors_header(config()) -> _.
 
 unsupported_cors_method(C) ->
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
     SourceUrl = <<"https://oops.io/">>,
     Params = construct_params(SourceUrl),
-    C1 = set_api_auth_token(unsupported_cors_method, [read, write], C),
+    C1 = set_api_auth_token(unsupported_cors_method, C),
     {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
     ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"PATCH">>}],
     {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
     false = lists:member(<<"access-control-allow-methods">>, Headers).
 
 supported_cors_method(C) ->
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
     SourceUrl = <<"https://oops.io/">>,
     Params = construct_params(SourceUrl),
-    C1 = set_api_auth_token(supported_cors_method, [read, write], C),
+    C1 = set_api_auth_token(supported_cors_method, C),
     {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
     ReqHeaders = [{<<"origin">>, <<"localhost">>}, {<<"access-control-request-method">>, <<"GET">>}],
     {ok, 200, Headers, _} = hackney:request(options, ShortUrl, ReqHeaders),
@@ -249,9 +240,15 @@ supported_cors_method(C) ->
     Allowed = binary:split(Returned, <<",">>, [global]).
 
 supported_cors_header(C) ->
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
     SourceUrl = <<"https://oops.io/">>,
     Params = construct_params(SourceUrl),
-    C1 = set_api_auth_token(supported_cors_header, [read, write], C),
+    C1 = set_api_auth_token(supported_cors_header, C),
     {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
     ReqHeaders = [
         {<<"origin">>, <<"localhost">>},
@@ -265,9 +262,15 @@ supported_cors_header(C) ->
     [_ | Allowed] = binary:split(Returned, <<",">>, [global]).
 
 unsupported_cors_header(C) ->
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
     SourceUrl = <<"https://oops.io/">>,
     Params = construct_params(SourceUrl),
-    C1 = set_api_auth_token(unsupported_cors_header, [read, write], C),
+    C1 = set_api_auth_token(unsupported_cors_header, C),
     {ok, 201, _, #{<<"shortenedUrl">> := ShortUrl}} = shorten_url(Params, C1),
     ReqHeaders = [
         {<<"origin">>, <<"localhost">>},
@@ -294,14 +297,20 @@ construct_params(SourceUrl, Lifetime) ->
 woody_timeout_test(C) ->
     Apps = genlib_app:start_application_with(
         shortener,
-        get_app_config(
+        shortener_ct_helper:get_app_config(
             ?config(port, C),
             ?config(netloc, C),
             get_keysource("keys/local/private.pem", C),
             <<"http://invalid_url:8022/v1/automaton">>
         )
     ),
-    C2 = set_api_auth_token(woody_timeout_test, [read, write], C),
+    shortener_ct_helper:mock_services(
+        [
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+        ],
+        C
+    ),
+    C2 = set_api_auth_token(woody_timeout_test, C),
     SourceUrl = <<"https://example.com/">>,
     Params = construct_params(SourceUrl),
     {Time, {error, {invalid_response_code, 503}}} =
@@ -316,7 +325,7 @@ woody_timeout_test(C) ->
 health_check_passing(C) ->
     Apps = genlib_app:start_application_with(
         shortener,
-        get_app_config(
+        shortener_ct_helper:get_app_config(
             ?config(port, C),
             ?config(netloc, C),
             get_keysource("keys/local/private.pem", C)
@@ -328,14 +337,11 @@ health_check_passing(C) ->
     genlib_app:stop_unload_applications(Apps).
 
 %%
-set_api_auth_token(Name, Permissions, C) ->
+set_api_auth_token(Name, C) ->
     UserID = genlib:to_binary(Name),
-    ACL = construct_shortener_acl(Permissions),
+    ACL = construct_shortener_acl([]),
     {ok, T} = shortener_authorizer_jwt:issue({{UserID, shortener_acl:from_list(ACL)}, #{}}, unlimited),
     lists:keystore(api_auth_token, 1, C, {api_auth_token, T}).
-
-clean_api_auth_token(C) ->
-    lists:keydelete(api_auth_token, 1, C).
 
 construct_shortener_acl(Permissions) ->
     lists:map(fun(P) -> {['shortened-urls'], P} end, Permissions).
@@ -391,57 +397,3 @@ append_request_id(Params = #{header := Headers}) ->
 
 format_ts(Ts) ->
     genlib_rfc3339:format(Ts, second).
-
-%%
-
-get_app_config(Port, Netloc, PemFile) ->
-    get_app_config(Port, Netloc, PemFile, <<"http://machinegun:8022/v1/automaton">>).
-
-get_app_config(Port, Netloc, PemFile, AutomatonUrl) ->
-    [
-        {space_size, 8},
-        {hash_algorithm, sha256},
-        {api, #{
-            ip => "::",
-            port => Port,
-            authorizer => #{
-                signee => local,
-                keyset => #{
-                    local => {pem_file, PemFile}
-                }
-            },
-            source_url_whitelist => [
-                "https://*",
-                "ftp://*",
-                "http://localhost/*"
-            ],
-            short_url_template => #{
-                scheme => http,
-                netloc => Netloc,
-                path => "/r/e/d/i/r/"
-            }
-        }},
-        {processor, #{
-            ip => "::",
-            port => 8022
-        }},
-        {health_check, #{
-            service => {erl_health, service, [<<"shortener">>]}
-        }},
-        {service_clients, #{
-            automaton => #{
-                url => AutomatonUrl,
-                retries => #{
-                    % function => retry strategy
-                    % '_' work as "any"
-                    % default value is 'finish'
-                    % for more info look genlib_retry :: strategy()
-                    % https://github.com/rbkmoney/genlib/blob/master/src/genlib_retry.erl#L19
-                    'Start' => {linear, 3, 1000},
-                    'GetMachine' => {linear, 3, 1000},
-                    'Remove' => {linear, 3, 1000},
-                    '_' => finish
-                }
-            }
-        }}
-    ].

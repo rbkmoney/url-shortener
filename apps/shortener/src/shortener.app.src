@@ -14,6 +14,8 @@
         cowboy_access_log,
         swag_server,
         mg_proto,
+        bouncer_proto,
+        bouncer_client,
         woody,
         woody_user_identity,
         erl_health,
