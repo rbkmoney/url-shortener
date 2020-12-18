@@ -55,13 +55,13 @@ authorize_operation(OperationID, Slug, ReqContext, WoodyCtx) ->
     Email = maps:get(<<"email">>, Claims, undefined),
     JudgeContext = #{
         fragments => #{
-            <<"env">> => bouncer_context_helpers:make_default_env_context_fragment(),
-            <<"auth">> => bouncer_context_helpers:make_auth_context_fragment(#{
+            <<"env">> => bouncer_context_helpers:make_env_fragment(#{}),
+            <<"auth">> => bouncer_context_helpers:make_auth_fragment(#{
                 method => <<"SessionToken">>,
                 expiration => genlib_rfc3339:format(ExpiresAt, second)
             }),
-            <<"user">> => bouncer_context_helpers:make_user_context_fragment(#{id => SubjectID, email => Email}),
-            <<"requester">> => bouncer_context_helpers:make_requester_context_fragment(#{ip => IpAddress}),
+            <<"user">> => bouncer_context_helpers:make_user_fragment(#{id => SubjectID, email => Email}),
+            <<"requester">> => bouncer_context_helpers:make_requester_fragment(#{ip => IpAddress}),
             <<"shortener">> => shortener_bouncer_client:make_shortener_context_fragment(
                 genlib:to_binary(OperationID),
                 ID,
