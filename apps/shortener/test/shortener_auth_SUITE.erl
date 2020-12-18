@@ -117,7 +117,9 @@ failed_authorization(C) ->
 insufficient_permissions(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = forbidden}} end}
+            {bouncer, fun('Judge', _) -> {ok,
+                #bdcs_Judgement{resolution = {forbidden, #bdcs_ResolutionForbidden{}}, resolution_legacy = forbidden}
+            } end}
         ],
         C
     ),
@@ -133,11 +135,20 @@ readonly_permissions(C) ->
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case get_operation_id(Fragments) of
                     <<"ShortenUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = allowed}};
+                        {ok, #bdcs_Judgement{
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                            resolution_legacy = allowed
+                        }};
                     <<"GetShortenedUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = allowed}};
+                        {ok, #bdcs_Judgement{
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                            resolution_legacy = allowed
+                        }};
                     <<"DeleteShortenedUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = forbidden}}
+                        {ok, #bdcs_Judgement{
+                            resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                            resolution_legacy = forbidden
+                        }}
                 end
             end}
         ],
@@ -155,20 +166,35 @@ other_subject_delete(C) ->
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case get_operation_id(Fragments) of
                     <<"ShortenUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = allowed}};
+                        {ok, #bdcs_Judgement{
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                            resolution_legacy = allowed
+                        }};
                     <<"GetShortenedUrl">> ->
                         case get_owner_info(Fragments) of
                             {ID, ID} ->
-                                {ok, #bdcs_Judgement{resolution = allowed}};
+                                {ok, #bdcs_Judgement{
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                                    resolution_legacy = allowed
+                                }};
                             _ ->
-                                {ok, #bdcs_Judgement{resolution = forbidden}}
+                                {ok, #bdcs_Judgement{
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                                    resolution_legacy = forbidden
+                                }}
                         end;
                     <<"DeleteShortenedUrl">> ->
                         case get_owner_info(Fragments) of
                             {ID, ID} ->
-                                {ok, #bdcs_Judgement{resolution = allowed}};
+                                {ok, #bdcs_Judgement{
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                                    resolution_legacy = allowed
+                                }};
                             _ ->
-                                {ok, #bdcs_Judgement{resolution = forbidden}}
+                                {ok, #bdcs_Judgement{
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                                    resolution_legacy = forbidden
+                                }}
                         end
                 end
             end}
@@ -190,20 +216,35 @@ other_subject_read(C) ->
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case get_operation_id(Fragments) of
                     <<"ShortenUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = allowed}};
+                        {ok, #bdcs_Judgement{
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                            resolution_legacy = allowed
+                        }};
                     <<"GetShortenedUrl">> ->
                         case get_owner_info(Fragments) of
                             {ID, ID} ->
-                                {ok, #bdcs_Judgement{resolution = allowed}};
+                                {ok, #bdcs_Judgement{
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                                    resolution_legacy = allowed
+                                }};
                             _ ->
-                                {ok, #bdcs_Judgement{resolution = forbidden}}
+                                {ok, #bdcs_Judgement{
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                                    resolution_legacy = forbidden
+                                }}
                         end;
                     <<"DeleteShortenedUrl">> ->
                         case get_owner_info(Fragments) of
                             {ID, ID} ->
-                                {ok, #bdcs_Judgement{resolution = allowed}};
+                                {ok, #bdcs_Judgement{
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                                    resolution_legacy = allowed
+                                }};
                             _ ->
-                                {ok, #bdcs_Judgement{resolution = forbidden}}
+                                {ok, #bdcs_Judgement{
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                                    resolution_legacy = forbidden
+                                }}
                         end
                 end
             end}
