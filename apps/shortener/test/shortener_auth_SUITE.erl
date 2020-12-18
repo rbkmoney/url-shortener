@@ -117,9 +117,12 @@ failed_authorization(C) ->
 insufficient_permissions(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok,
-                #bdcs_Judgement{resolution = {forbidden, #bdcs_ResolutionForbidden{}}, resolution_legacy = forbidden}
-            } end}
+            {bouncer, fun('Judge', _) ->
+                {ok, #bdcs_Judgement{
+                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                    resolution_legacy = forbidden
+                }}
+            end}
         ],
         C
     ),
