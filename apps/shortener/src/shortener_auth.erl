@@ -53,6 +53,10 @@ authorize_operation(OperationID, Slug, ReqContext, WoodyCtx) ->
     Owner = get_slug_owner(Slug),
     ID = get_slug_id(Slug),
     Email = maps:get(<<"email">>, Claims, undefined),
+    #{
+        id := SubjectID,
+        realm := Realm
+    } = woody_user_identity:get(WoodyCtx),
     JudgeContext = #{
         fragments => #{
             <<"env">> => bouncer_context_helpers:make_env_fragment(#{}),
@@ -60,7 +64,11 @@ authorize_operation(OperationID, Slug, ReqContext, WoodyCtx) ->
                 method => <<"SessionToken">>,
                 expiration => genlib_rfc3339:format(ExpiresAt, second)
             }),
-            <<"user">> => bouncer_context_helpers:make_user_fragment(#{id => SubjectID, email => Email}),
+            <<"user">> => bouncer_context_helpers:make_user_fragment(#{
+                id => SubjectID,
+                realm => #{id => Realm},
+                email => Email
+            }),
             <<"requester">> => bouncer_context_helpers:make_requester_fragment(#{ip => IpAddress}),
             <<"shortener">> => shortener_bouncer_client:make_shortener_context_fragment(
                 genlib:to_binary(OperationID),
