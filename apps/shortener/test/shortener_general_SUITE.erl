@@ -128,7 +128,10 @@ end_per_testcase(_Name, C) ->
 successful_redirect(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
@@ -143,7 +146,10 @@ successful_redirect(C) ->
 successful_delete(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
@@ -157,7 +163,10 @@ successful_delete(C) ->
 fordidden_source_url(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
@@ -171,7 +180,10 @@ fordidden_source_url(C) ->
 url_expired(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
@@ -186,7 +198,10 @@ url_expired(C) ->
 always_unique_url(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
@@ -210,7 +225,10 @@ always_unique_url(C) ->
 unsupported_cors_method(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
@@ -225,7 +243,10 @@ unsupported_cors_method(C) ->
 supported_cors_method(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
@@ -242,7 +263,10 @@ supported_cors_method(C) ->
 supported_cors_header(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
@@ -264,7 +288,10 @@ supported_cors_header(C) ->
 unsupported_cors_header(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
@@ -306,7 +333,10 @@ woody_timeout_test(C) ->
     ),
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = allowed}} end}
+            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{
+                resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                resolution_legacy = allowed
+            }} end}
         ],
         C
     ),
