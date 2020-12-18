@@ -58,21 +58,30 @@ authorize_operation(OperationID, Slug, ReqContext, WoodyCtx) ->
         realm := Realm
     } = woody_user_identity:get(WoodyCtx),
     Acc0 = bouncer_context_helpers:make_env_fragment(#{}),
-    Acc1 = bouncer_context_helpers:add_auth(#{
-        method => <<"SessionToken">>,
-        expiration => genlib_rfc3339:format(ExpiresAt, second)
-    }, Acc0),
-    Acc2 = bouncer_context_helpers:add_user(#{
-        id => SubjectID,
-        realm => #{id => Realm},
-        email => Email
-    }, Acc1),
+    Acc1 = bouncer_context_helpers:add_auth(
+        #{
+            method => <<"SessionToken">>,
+            expiration => genlib_rfc3339:format(ExpiresAt, second)
+        },
+        Acc0
+    ),
+    Acc2 = bouncer_context_helpers:add_user(
+        #{
+            id => SubjectID,
+            realm => #{id => Realm},
+            email => Email
+        },
+        Acc1
+    ),
     Acc3 = bouncer_context_helpers:add_requester(#{ip => IpAddress}, Acc2),
-    Acc4 = shortener_bouncer_client:add_shortener(#{
-        operation_id => genlib:to_binary(OperationID),
-        shortened_url_id => ID,
-        shortened_url_owner_id => Owner
-    }, Acc3),
+    Acc4 = shortener_bouncer_client:add_shortener(
+        #{
+            operation_id => genlib:to_binary(OperationID),
+            shortened_url_id => ID,
+            shortened_url_owner_id => Owner
+        },
+        Acc3
+    ),
     JudgeContext = #{fragments => #{<<"shortener">> => Acc4}},
     {ok, RulesetID} = application:get_env(shortener, bouncer_ruleset_id),
     case bouncer_client:judge(RulesetID, JudgeContext, WoodyCtx) of

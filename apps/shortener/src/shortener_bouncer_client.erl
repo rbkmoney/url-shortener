@@ -17,8 +17,7 @@
     shortened_url_owner_id := owner() | undefined
 }.
 
--spec add_shortener(params(), bouncer_client:context_fragment()) ->
-    bouncer_client:context_fragment().
+-spec add_shortener(params(), bouncer_client:context_fragment()) -> bouncer_client:context_fragment().
 add_shortener(Params, ContextFragment) ->
     #{
         operation_id := OperationID,
