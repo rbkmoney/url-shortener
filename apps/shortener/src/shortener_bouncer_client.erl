@@ -15,7 +15,7 @@
 -spec make_shortener_context_fragment(operation_id(), id() | undefined, owner() | undefined) ->
     bouncer_client:context_fragment().
 make_shortener_context_fragment(OperationID, ID, OwnerID) ->
-    {fragment, #bctx_v1_ContextFragment{
+    #bctx_v1_ContextFragment{
         shortener = #bctx_v1_ContextUrlShortener{
             op = #bctx_v1_UrlShortenerOperation{
                 id = OperationID,
@@ -27,4 +27,4 @@ make_shortener_context_fragment(OperationID, ID, OwnerID) ->
                 }
             }
         }
-    }}.
+    }.
