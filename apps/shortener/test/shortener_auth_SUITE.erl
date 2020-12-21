@@ -377,4 +377,4 @@ decode(Content) ->
             CtxThrift;
         Leftovers ->
             {error, {excess_binary_data, Leftovers}}
-   end.
+    end.
