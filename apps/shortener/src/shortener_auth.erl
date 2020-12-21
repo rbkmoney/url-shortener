@@ -74,14 +74,7 @@ authorize_operation(OperationID, Slug, ReqContext, WoodyCtx) ->
         Acc1
     ),
     Acc3 = bouncer_context_helpers:add_requester(#{ip => IpAddress}, Acc2),
-    Acc4 = shortener_bouncer_client:add_shortener(
-        #{
-            operation_id => genlib:to_binary(OperationID),
-            shortened_url_id => ID,
-            shortened_url_owner_id => Owner
-        },
-        Acc3
-    ),
+    Acc4 = shortener_bouncer_client:add_shortener(genlib:to_binary(OperationID), ID, Owner, Acc3),
     JudgeContext = #{fragments => #{<<"shortener">> => Acc4}},
     {ok, RulesetID} = application:get_env(shortener, bouncer_ruleset_id),
     case bouncer_client:judge(RulesetID, JudgeContext, WoodyCtx) of

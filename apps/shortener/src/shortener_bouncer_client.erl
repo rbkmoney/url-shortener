@@ -4,26 +4,17 @@
 
 %% API
 
--export([add_shortener/2]).
+-export([add_shortener/4]).
 
 %%
 
 -type operation_id() :: binary().
 -type id() :: shortener_slug:id().
 -type owner() :: shortener_slug:owner().
--type params() :: #{
-    operation_id := operation_id(),
-    shortened_url_id := id() | undefined,
-    shortened_url_owner_id := owner() | undefined
-}.
 
--spec add_shortener(params(), bouncer_client:context_fragment()) -> bouncer_client:context_fragment().
-add_shortener(Params, ContextFragment) ->
-    #{
-        operation_id := OperationID,
-        shortened_url_id := ID,
-        shortened_url_owner_id := OwnerID
-    } = Params,
+-spec add_shortener(operation_id(), id() | undefined, owner() | undefined, bouncer_client:context_fragment()) ->
+    bouncer_client:context_fragment().
+add_shortener(OperationID, ID, OwnerID, ContextFragment) ->
     ContextFragment#bctx_v1_ContextFragment{
         shortener = #bctx_v1_ContextUrlShortener{
             op = #bctx_v1_UrlShortenerOperation{
