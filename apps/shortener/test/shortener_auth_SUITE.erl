@@ -117,7 +117,12 @@ failed_authorization(C) ->
 insufficient_permissions(C) ->
     shortener_ct_helper:mock_services(
         [
-            {bouncer, fun('Judge', _) -> {ok, #bdcs_Judgement{resolution = forbidden}} end}
+            {bouncer, fun('Judge', _) ->
+                {ok, #bdcs_Judgement{
+                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                    resolution_legacy = forbidden
+                }}
+            end}
         ],
         C
     ),
@@ -131,13 +136,23 @@ readonly_permissions(C) ->
     shortener_ct_helper:mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
-                case get_operation_id(Fragments) of
+                DecodedFragment = decode_shortener(Fragments),
+                case get_operation_id(DecodedFragment) of
                     <<"ShortenUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = allowed}};
+                        {ok, #bdcs_Judgement{
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                            resolution_legacy = allowed
+                        }};
                     <<"GetShortenedUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = allowed}};
+                        {ok, #bdcs_Judgement{
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                            resolution_legacy = allowed
+                        }};
                     <<"DeleteShortenedUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = forbidden}}
+                        {ok, #bdcs_Judgement{
+                            resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                            resolution_legacy = forbidden
+                        }}
                 end
             end}
         ],
@@ -153,22 +168,38 @@ other_subject_delete(C) ->
     shortener_ct_helper:mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
-                case get_operation_id(Fragments) of
+                DecodedFragment = decode_shortener(Fragments),
+                case get_operation_id(DecodedFragment) of
                     <<"ShortenUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = allowed}};
+                        {ok, #bdcs_Judgement{
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                            resolution_legacy = allowed
+                        }};
                     <<"GetShortenedUrl">> ->
-                        case get_owner_info(Fragments) of
+                        case get_owner_info(DecodedFragment) of
                             {ID, ID} ->
-                                {ok, #bdcs_Judgement{resolution = allowed}};
+                                {ok, #bdcs_Judgement{
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                                    resolution_legacy = allowed
+                                }};
                             _ ->
-                                {ok, #bdcs_Judgement{resolution = forbidden}}
+                                {ok, #bdcs_Judgement{
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                                    resolution_legacy = forbidden
+                                }}
                         end;
                     <<"DeleteShortenedUrl">> ->
-                        case get_owner_info(Fragments) of
+                        case get_owner_info(DecodedFragment) of
                             {ID, ID} ->
-                                {ok, #bdcs_Judgement{resolution = allowed}};
+                                {ok, #bdcs_Judgement{
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                                    resolution_legacy = allowed
+                                }};
                             _ ->
-                                {ok, #bdcs_Judgement{resolution = forbidden}}
+                                {ok, #bdcs_Judgement{
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                                    resolution_legacy = forbidden
+                                }}
                         end
                 end
             end}
@@ -188,22 +219,38 @@ other_subject_read(C) ->
     shortener_ct_helper:mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
-                case get_operation_id(Fragments) of
+                DecodedFragment = decode_shortener(Fragments),
+                case get_operation_id(DecodedFragment) of
                     <<"ShortenUrl">> ->
-                        {ok, #bdcs_Judgement{resolution = allowed}};
+                        {ok, #bdcs_Judgement{
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                            resolution_legacy = allowed
+                        }};
                     <<"GetShortenedUrl">> ->
-                        case get_owner_info(Fragments) of
+                        case get_owner_info(DecodedFragment) of
                             {ID, ID} ->
-                                {ok, #bdcs_Judgement{resolution = allowed}};
+                                {ok, #bdcs_Judgement{
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                                    resolution_legacy = allowed
+                                }};
                             _ ->
-                                {ok, #bdcs_Judgement{resolution = forbidden}}
+                                {ok, #bdcs_Judgement{
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                                    resolution_legacy = forbidden
+                                }}
                         end;
                     <<"DeleteShortenedUrl">> ->
-                        case get_owner_info(Fragments) of
+                        case get_owner_info(DecodedFragment) of
                             {ID, ID} ->
-                                {ok, #bdcs_Judgement{resolution = allowed}};
+                                {ok, #bdcs_Judgement{
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                                    resolution_legacy = allowed
+                                }};
                             _ ->
-                                {ok, #bdcs_Judgement{resolution = forbidden}}
+                                {ok, #bdcs_Judgement{
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
+                                    resolution_legacy = forbidden
+                                }}
                         end
                 end
             end}
@@ -291,27 +338,15 @@ append_request_id(Params = #{header := Headers}) ->
 format_ts(Ts) ->
     genlib_rfc3339:format(Ts, second).
 
-get_operation_id(#bdcs_Context{
-    fragments = #{
-        <<"shortener">> := #bctx_ContextFragment{
-            type = v1_thrift_binary,
-            content = Fragment
-        }
-    }
+get_operation_id(#bctx_v1_ContextFragment{
+    shortener = #bctx_v1_ContextUrlShortener{op = #bctx_v1_UrlShortenerOperation{id = OperationID}}
 }) ->
-    case decode(Fragment) of
-        {error, _} = Error ->
-            error(Error);
-        #bctx_v1_ContextFragment{
-            shortener = #bctx_v1_ContextUrlShortener{op = #bctx_v1_UrlShortenerOperation{id = OperationID}}
-        } ->
-            OperationID
-    end.
+    OperationID.
 
 get_owner_info(Context) ->
     {get_owner_id(Context), get_user_id(Context)}.
 
-get_owner_id(#bdcs_Context{
+decode_shortener(#bdcs_Context{
     fragments = #{
         <<"shortener">> := #bctx_ContextFragment{
             type = v1_thrift_binary,
@@ -320,41 +355,26 @@ get_owner_id(#bdcs_Context{
     }
 }) ->
     case decode(Fragment) of
-        {error, _} = Error ->
-            error(Error);
-        #bctx_v1_ContextFragment{
-            shortener = #bctx_v1_ContextUrlShortener{op = #bctx_v1_UrlShortenerOperation{shortened_url = Url}}
-        } ->
-            #bctx_v1_ShortenedUrl{owner = #bctx_v1_Entity{id = OwnerID}} = Url,
-            OwnerID
+        #bctx_v1_ContextFragment{} = DecodedFragment ->
+            DecodedFragment
     end.
 
-get_user_id(#bdcs_Context{
-    fragments = #{
-        <<"user">> := #bctx_ContextFragment{
-            type = v1_thrift_binary,
-            content = Fragment
-        }
-    }
+get_owner_id(#bctx_v1_ContextFragment{
+    shortener = #bctx_v1_ContextUrlShortener{op = #bctx_v1_UrlShortenerOperation{shortened_url = Url}}
 }) ->
-    case decode(Fragment) of
-        {error, _} = Error ->
-            error(Error);
-        #bctx_v1_ContextFragment{user = #bctx_v1_User{id = UserID}} ->
-            UserID
-    end.
+    #bctx_v1_ShortenedUrl{owner = #bctx_v1_Entity{id = OwnerID}} = Url,
+    OwnerID.
+
+get_user_id(#bctx_v1_ContextFragment{user = #bctx_v1_User{id = UserID}}) ->
+    UserID.
 
 decode(Content) ->
     Type = {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}},
     Codec = thrift_strict_binary_codec:new(Content),
-    case thrift_strict_binary_codec:read(Codec, Type) of
-        {ok, CtxThrift, Codec1} ->
-            case thrift_strict_binary_codec:close(Codec1) of
-                <<>> ->
-                    CtxThrift;
-                Leftovers ->
-                    {error, {excess_binary_data, Leftovers}}
-            end;
-        Error ->
-            Error
+    {ok, CtxThrift, Codec1} = thrift_strict_binary_codec:read(Codec, Type),
+    case thrift_strict_binary_codec:close(Codec1) of
+        <<>> ->
+            CtxThrift;
+        Leftovers ->
+            {error, {excess_binary_data, Leftovers}}
     end.
