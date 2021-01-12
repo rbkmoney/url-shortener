@@ -130,8 +130,7 @@ successful_redirect(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -150,8 +149,7 @@ successful_delete(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -169,8 +167,7 @@ fordidden_source_url(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -188,8 +185,7 @@ url_expired(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -208,8 +204,7 @@ always_unique_url(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -237,8 +232,7 @@ unsupported_cors_method(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -257,8 +251,7 @@ supported_cors_method(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -279,8 +272,7 @@ supported_cors_header(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -306,8 +298,7 @@ unsupported_cors_header(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -353,8 +344,7 @@ woody_timeout_test(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                    resolution_legacy = allowed
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                 }}
             end}
         ],

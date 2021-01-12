@@ -119,8 +119,7 @@ insufficient_permissions(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
-                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
-                    resolution_legacy = forbidden
+                    resolution = {forbidden, #bdcs_ResolutionForbidden{}}
                 }}
             end}
         ],
@@ -140,18 +139,15 @@ readonly_permissions(C) ->
                 case get_operation_id(DecodedFragment) of
                     <<"ShortenUrl">> ->
                         {ok, #bdcs_Judgement{
-                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                            resolution_legacy = allowed
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}}
                         }};
                     <<"GetShortenedUrl">> ->
                         {ok, #bdcs_Judgement{
-                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                            resolution_legacy = allowed
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}}
                         }};
                     <<"DeleteShortenedUrl">> ->
                         {ok, #bdcs_Judgement{
-                            resolution = {forbidden, #bdcs_ResolutionForbidden{}},
-                            resolution_legacy = forbidden
+                            resolution = {forbidden, #bdcs_ResolutionForbidden{}}
                         }}
                 end
             end}
@@ -172,33 +168,28 @@ other_subject_delete(C) ->
                 case get_operation_id(DecodedFragment) of
                     <<"ShortenUrl">> ->
                         {ok, #bdcs_Judgement{
-                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                            resolution_legacy = allowed
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}}
                         }};
                     <<"GetShortenedUrl">> ->
                         case get_owner_info(DecodedFragment) of
                             {ID, ID} ->
                                 {ok, #bdcs_Judgement{
-                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                                    resolution_legacy = allowed
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                                 }};
                             _ ->
                                 {ok, #bdcs_Judgement{
-                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
-                                    resolution_legacy = forbidden
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}}
                                 }}
                         end;
                     <<"DeleteShortenedUrl">> ->
                         case get_owner_info(DecodedFragment) of
                             {ID, ID} ->
                                 {ok, #bdcs_Judgement{
-                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                                    resolution_legacy = allowed
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                                 }};
                             _ ->
                                 {ok, #bdcs_Judgement{
-                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
-                                    resolution_legacy = forbidden
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}}
                                 }}
                         end
                 end
@@ -223,33 +214,28 @@ other_subject_read(C) ->
                 case get_operation_id(DecodedFragment) of
                     <<"ShortenUrl">> ->
                         {ok, #bdcs_Judgement{
-                            resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                            resolution_legacy = allowed
+                            resolution = {allowed, #bdcs_ResolutionAllowed{}}
                         }};
                     <<"GetShortenedUrl">> ->
                         case get_owner_info(DecodedFragment) of
                             {ID, ID} ->
                                 {ok, #bdcs_Judgement{
-                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                                    resolution_legacy = allowed
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                                 }};
                             _ ->
                                 {ok, #bdcs_Judgement{
-                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
-                                    resolution_legacy = forbidden
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}}
                                 }}
                         end;
                     <<"DeleteShortenedUrl">> ->
                         case get_owner_info(DecodedFragment) of
                             {ID, ID} ->
                                 {ok, #bdcs_Judgement{
-                                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
-                                    resolution_legacy = allowed
+                                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
                                 }};
                             _ ->
                                 {ok, #bdcs_Judgement{
-                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}},
-                                    resolution_legacy = forbidden
+                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}}
                                 }}
                         end
                 end
