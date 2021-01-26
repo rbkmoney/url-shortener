@@ -4,7 +4,7 @@
  {<<"bear">>,{pkg,<<"bear">>,<<"0.8.7">>},2},
  {<<"bouncer_client">>,
   {git,"https://github.com/rbkmoney/bouncer_client_erlang.git",
-       {ref,"f01fc162191f97c536c4f00a76e6e7e646f76240"}},
+       {ref,"36cb53a7d4fea4861d5ea5cf7e2f572eba941fde"}},
   0},
  {<<"bouncer_proto">>,
   {git,"https://github.com/rbkmoney/bouncer-proto.git",

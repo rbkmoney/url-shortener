@@ -61,7 +61,8 @@ authorize_operation(OperationID, Slug, ReqContext, WoodyCtx) ->
     Acc1 = bouncer_context_helpers:add_auth(
         #{
             method => <<"SessionToken">>,
-            expiration => genlib_rfc3339:format(ExpiresAt, second)
+            expiration => genlib_rfc3339:format(ExpiresAt, second),
+            token => #{id => shortener_authorizer_jwt:get_token_id(Claims)}
         },
         Acc0
     ),

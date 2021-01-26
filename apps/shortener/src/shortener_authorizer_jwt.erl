@@ -14,6 +14,12 @@
 -export([issue/2]).
 -export([verify/1]).
 
+-export([get_token_id/1]).
+
+-define(CLAIM_TOKEN_ID, <<"jti">>).
+-define(CLAIM_SUBJECT_ID, <<"sub">>).
+-define(CLAIM_EXPIRES_AT, <<"exp">>).
+
 %%
 
 -include_lib("jose/include/jose_jwk.hrl").
@@ -195,9 +201,9 @@ issue(Auth, Expiration) ->
 construct_final_claims({{Subject, ACL}, Claims}, Expiration) ->
     maps:merge(
         Claims#{
-            <<"jti">> => unique_id(),
-            <<"sub">> => Subject,
-            <<"exp">> => get_expires_at(Expiration)
+            ?CLAIM_TOKEN_ID => unique_id(),
+            ?CLAIM_SUBJECT_ID => Subject,
+            ?CLAIM_EXPIRES_AT => get_expires_at(Expiration)
         },
         encode_roles(shortener_acl:encode(ACL))
     ).
@@ -275,7 +281,7 @@ validate_claims(Claims) ->
 
 validate_claims(Claims, [{Name, Claim, Validator} | Rest], Acc) ->
     V = Validator(Name, maps:get(Claim, Claims, undefined)),
-    validate_claims(maps:without([Claim], Claims), Rest, Acc#{Name => V});
+    validate_claims(Claims, Rest, Acc#{Name => V});
 validate_claims(Claims, [], Acc) ->
     {Acc, Claims}.
 
@@ -302,9 +308,9 @@ get_alg(#{}) ->
 
 get_validators() ->
     [
-        {token_id, <<"jti">>, fun check_presence/2},
-        {subject_id, <<"sub">>, fun check_presence/2},
-        {expires_at, <<"exp">>, fun check_expiration/2}
+        {token_id, ?CLAIM_TOKEN_ID, fun check_presence/2},
+        {subject_id, ?CLAIM_SUBJECT_ID, fun check_presence/2},
+        {expires_at, ?CLAIM_EXPIRES_AT, fun check_expiration/2}
     ].
 
 check_presence(_, V) when is_binary(V) ->
@@ -353,6 +359,12 @@ decode_roles(
     {Roles, maps:remove(<<"resource_access">>, Claims)};
 decode_roles(_) ->
     throw({invalid_token, {missing, acl}}).
+
+%%
+
+-spec get_token_id(claims()) -> binary().
+get_token_id(Claims) ->
+    maps:get(?CLAIM_TOKEN_ID, Claims).
 
 %%
 
