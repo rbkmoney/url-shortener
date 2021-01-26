@@ -50,21 +50,19 @@ set_cfg(Service, Url) ->
 mock_services_(Services, Config) when is_list(Config) ->
     mock_services_(Services, ?config(test_sup, Config));
 mock_services_(Services, SupPid) when is_pid(SupPid) ->
-    Name = lists:map(fun get_service_name/1, Services),
-
-    Port = get_random_port(),
+    ServerID = {dummy, lists:map(fun get_service_name/1, Services)},
     {ok, IP} = inet:parse_address(?SHORTENER_IP),
     ChildSpec = woody_server:child_spec(
-        {dummy, Name},
-        #{
+        ServerID,
+        Options = #{
             ip => IP,
-            port => Port,
+            port => 0,
             event_handler => scoper_woody_event_handler,
             handlers => lists:map(fun mock_service_handler/1, Services)
         }
     ),
     {ok, _} = supervisor:start_child(SupPid, ChildSpec),
-
+    {IP, Port} = woody_server:get_addr(ServerID, Options),
     lists:foldl(
         fun(Service, Acc) ->
             ServiceName = get_service_name(Service),
@@ -89,10 +87,6 @@ mock_service_handler(ServiceName, WoodyService, Fun) ->
 
 get_service_modname(bouncer) ->
     {bouncer_decisions_thrift, 'Arbiter'}.
-
-% TODO not so failproof, ideally we need to bind socket first and then give to a ranch listener
-get_random_port() ->
-    rand:uniform(32768) + 32767.
 
 make_url(ServiceName, Port) ->
     iolist_to_binary(["http://", ?SHORTENER_HOST_NAME, ":", integer_to_list(Port), make_path(ServiceName)]).
