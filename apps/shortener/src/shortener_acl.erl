@@ -193,7 +193,7 @@ encode_entry({{_Priority, Scope}, Permissions}) ->
             P = encode_permission(Permission),
             <<S/binary, ":", P/binary>>
         end
-        || Permission <- Permissions
+     || Permission <- Permissions
     ].
 
 encode_scope(Scope) ->

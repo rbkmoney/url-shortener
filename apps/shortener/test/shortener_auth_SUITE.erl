@@ -2,6 +2,7 @@
 
 -include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
 -include_lib("bouncer_proto/include/bouncer_context_v1_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_base_thrift.hrl").
 
 -export([all/0]).
 -export([groups/0]).
@@ -348,7 +349,7 @@ decode_shortener(#bdcs_Context{
 get_owner_id(#bctx_v1_ContextFragment{
     shortener = #bctx_v1_ContextUrlShortener{op = #bctx_v1_UrlShortenerOperation{shortened_url = Url}}
 }) ->
-    #bctx_v1_ShortenedUrl{owner = #bctx_v1_Entity{id = OwnerID}} = Url,
+    #bctx_v1_ShortenedUrl{owner = #bouncer_base_Entity{id = OwnerID}} = Url,
     OwnerID.
 
 get_user_id(#bctx_v1_ContextFragment{user = #bctx_v1_User{id = UserID}}) ->
