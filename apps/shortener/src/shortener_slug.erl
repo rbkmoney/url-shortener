@@ -198,9 +198,12 @@ get_service_modname(automaton) ->
 %%
 
 -type signal() :: mg_proto_state_processing_thrift:'SignalArgs'().
+-type repair_args() :: mg_proto_state_processing_thrift:'RepairArgs'().
 -type signal_result() :: mg_proto_state_processing_thrift:'SignalResult'().
 
--spec handle_function('ProcessSignal', {signal()}, ctx(), woody:options()) -> {ok, signal_result()} | no_return().
+-spec handle_function
+    ('ProcessSignal', {signal()}, ctx(), woody:options()) -> {ok, signal_result()} | no_return();
+    ('ProcessRepair', {repair_args()}, ctx(), woody:options()) -> {ok, signal_result()} | no_return().
 handle_function(Func, Args, Ctx, _Opts) ->
     scoper:scope(
         machine,
@@ -224,10 +227,21 @@ handle_function(
             #mg_stateproc_InitSignal{arg = Args} ->
                 handle_init(unmarshal(term, Args), Ctx);
             #mg_stateproc_TimeoutSignal{} ->
-                handle_timeout(collapse_history(History), Ctx);
-            #mg_stateproc_RepairSignal{arg = Args} ->
-                handle_repair(unmarshal(term, Args), collapse_history(History), Ctx)
+                handle_timeout(collapse_history(History), Ctx)
         end,
+    {ok, handle_signal_result(Result, Machine)};
+handle_function(
+    'ProcessRepair',
+    {
+        #mg_stateproc_RepairArgs{
+            arg = Args,
+            machine = #mg_stateproc_Machine{id = ID, history = History} = Machine
+        }
+    },
+    Ctx
+) ->
+    ok = scoper:add_meta(#{id => ID}),
+    Result = handle_repair(unmarshal(term, Args), collapse_history(History), Ctx),
     {ok, handle_signal_result(Result, Machine)}.
 
 handle_signal_result(Result, Machine) ->
