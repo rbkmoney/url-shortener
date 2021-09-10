@@ -19,7 +19,6 @@
         woody,
         woody_user_identity,
         erl_health,
-        how_are_you,
         prometheus,
         prometheus_cowboy
     ]},
