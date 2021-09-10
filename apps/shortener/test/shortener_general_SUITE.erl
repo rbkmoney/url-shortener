@@ -215,8 +215,8 @@ always_unique_url(C) ->
     Params = construct_params(<<"https://oops.io/">>, 3600),
     {IDs, ShortUrls} = lists:unzip([
         {ID, ShortUrl}
-        || _ <- lists:seq(1, N),
-           {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} <- [shorten_url(Params, C1)]
+     || _ <- lists:seq(1, N),
+        {ok, 201, _, #{<<"id">> := ID, <<"shortenedUrl">> := ShortUrl}} <- [shorten_url(Params, C1)]
     ]),
     N = length(lists:usort(IDs)),
     N = length(lists:usort(ShortUrls)).

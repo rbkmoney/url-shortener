@@ -1,6 +1,7 @@
 -module(shortener_bouncer_client).
 
 -include_lib("bouncer_proto/include/bouncer_context_v1_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_base_thrift.hrl").
 
 %% API
 
@@ -21,7 +22,7 @@ add_shortener(OperationID, ID, OwnerID, ContextFragment) ->
                 id = OperationID,
                 shortened_url = #bctx_v1_ShortenedUrl{
                     id = ID,
-                    owner = #bctx_v1_Entity{
+                    owner = #bouncer_base_Entity{
                         id = OwnerID
                     }
                 }
